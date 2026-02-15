@@ -168,3 +168,25 @@ body { display: flex; flex-direction: column; }
   font-size: 15px; outline: none; transition: border-color .2s;
 }
 .save-sheet input:focus, .save-sheet textarea:focus { border-color: var(--primary); }
+
+/* ---------- Data management ---------- */
+.data-mgmt-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 10px; border: 1.5px solid #e2e8f0;
+  background: #fff; color: var(--text); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.data-mgmt-btn:active { transform: scale(.96); background: #f8fafc; }
+.data-mgmt-btn.danger { color: var(--danger); border-color: #fecdd3; }
+.data-mgmt-btn.danger:active { background: #fff1f2; }
+
+/* ---------- Toast notification ---------- */
+.toast {
+  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+  z-index: 3000; background: #1e293b; color: #fff; border-radius: 12px;
+  padding: 10px 20px; font-size: 14px; font-weight: 600;
+  box-shadow: 0 8px 30px rgba(0,0,0,.2);
+  animation: toastIn .3s ease, toastOut .3s ease 2.7s forwards;
+}
+@keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(-20px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { to { opacity:0; transform: translateX(-50%) translateY(-20px); } }

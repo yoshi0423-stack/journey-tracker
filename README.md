@@ -18,26 +18,53 @@
 ```
 ┌──────────────────────────────────────────────────────┐
 │  Browser (PWA)                                       │
-│  ┌───────────┬──────────┬──────────┬───────────────┐ │
-│  │  記録     │ マイマップ│ ふりかえり│  パラレル比較  │ │
-│  │  (Home)   │  (Map)   │ (Review) │  (Compare)    │ │
-│  └─────┬─────┴────┬─────┴────┬─────┴────┬──────────┘ │
-│        │ Geolocation API     │ Leaflet + OSM         │
-│        └──────────┬──────────┘                       │
-│                   │ fetch()                           │
-├───────────────────┼──────────────────────────────────┤
+│  ┌───────────────────────────────────────────────┐   │
+│  │  IndexedDB (デバイスローカル = プライマリDB)    │   │
+│  │  ├ activities   (記録データ)                   │   │
+│  │  ├ milestones   (マイルストーン)               │   │
+│  │  └ meta         (統計情報)                     │   │
+│  └─────────┬─────────────────────────────────────┘   │
+│            │ window.DB (db.js)                        │
+│  ┌─────────┼─────────────────────────────────────┐   │
+│  │  記録   │ マイマップ│ ふりかえり│ パラレル比較  │   │
+│  │  (Home) │  (Map)   │ (Review) │  (Compare)   │   │
+│  └────┬────┴────┬─────┴────┬─────┴────┬──────────┘   │
+│       │Geolocation API     │ Leaflet + OSM           │
+│       └─────────┬──────────┘                         │
+│                 │ バックグラウンド同期（オプショナル） │
+├─────────────────┼────────────────────────────────────┤
 │  Cloudflare Workers (Hono)                           │
-│  ┌────────────────┼──────────────────────────────┐   │
-│  │  /api/stats    │  /api/activities             │   │
-│  │  /api/heatmap  │  /api/milestones             │   │
-│  │  /api/review   │  /api/activities/:id (PATCH) │   │
-│  └────────────────┼──────────────────────────────┘   │
-│                   │                                  │
-│  Cloudflare D1 (SQLite)                              │
-│  ┌────────────────┼──────────────────────────────┐   │
-│  │  user_stats    │  activities  │  milestones   │   │
-│  └────────────────┴─────────────┴────────────────┘   │
+│  ┌──────────────┼──────────────────────────────┐     │
+│  │  /api/sync   │  /api/stats                 │     │
+│  │  /api/activities  │  /api/milestones        │     │
+│  │  /api/review │  /api/heatmap               │     │
+│  └──────────────┼──────────────────────────────┘     │
+│                 │                                    │
+│  Cloudflare D1 (SQLite) - バックアップ用             │
+│  ┌──────────────┼──────────────────────────────┐     │
+│  │  user_stats  │ activities │ milestones      │     │
+│  └──────────────┴────────────┴────────────────┘      │
 └──────────────────────────────────────────────────────┘
+```
+
+## データ保存方針
+
+### Local-First (デバイスファースト)
+
+| 項目 | 説明 |
+|------|------|
+| **プライマリDB** | IndexedDB (ブラウザ内蔵) |
+| **読み書き** | 全て IndexedDB 経由 (`window.DB`) |
+| **ネットワーク依存** | なし。完全オフライン動作 |
+| **サーバー同期** | オプショナル。バックグラウンドで `/api/sync` |
+| **データ管理** | エクスポート (JSON) / インポート / 全削除 |
+| **永続性** | ブラウザストレージに保存。エクスポートで別デバイスへ移行可 |
+
+### データの流れ
+
+```
+記録完了 → IndexedDB に直接保存 → 統計/マイルストーン再計算
+                                  → バックグラウンドでサーバー同期（失敗OK）
 ```
 
 ## 技術スタック
@@ -46,7 +73,8 @@
 |----------|------|
 | ランタイム | Cloudflare Workers (Edge) |
 | フレームワーク | Hono v4 |
-| データベース | Cloudflare D1 (SQLite) |
+| ローカルDB | IndexedDB (`db.js` ラッパー) |
+| サーバーDB | Cloudflare D1 (SQLite) - バックアップ |
 | 地図 | Leaflet 1.9 + OpenStreetMap |
 | CSS | Tailwind CSS (CDN) |
 | アイコン | Font Awesome 6 |
@@ -61,6 +89,7 @@
 - 一時停止 / 再開 / 終了の完全コントロール
 - 精度50m以上のノイズ自動フィルタ
 - 距離はHaversine公式でリアルタイム計算
+- **「デバイスに保存」** — ネットワーク不要で保存
 
 ### 2. 記録結果 (Save Modal)
 - ルートをLeaflet地図上にプレビュー表示
@@ -89,38 +118,37 @@
 - 時間帯分布（24時間ヒストグラム）
 - よく歩く時間帯のハイライト
 
-### 6. PWA対応
+### 6. データ管理 (Home Tab 内)
+- **エクスポート**: 全データをJSON形式でダウンロード
+- **インポート**: JSONファイルから復元（上書き）
+- **全削除**: データ完全クリア（2段階確認）
+
+### 7. PWA対応
 - `manifest.json` でホーム画面追加対応
-- Service Worker でオフラインキャッシュ
+- Service Worker でオフラインキャッシュ（db.js含む）
 - `apple-mobile-web-app-capable` メタタグ
 
 ## データモデル
 
-### user_stats
-```sql
-total_distance_m    REAL     -- 累計距離 (m)
-total_duration_sec  INTEGER  -- 累計時間 (秒)
-total_activities    INTEGER  -- 累計記録数
-activity_days       INTEGER  -- 活動日数
-first_activity_at   TEXT     -- 初回記録日時
-last_activity_at    TEXT     -- 最終記録日時
+### IndexedDB (プライマリ)
+
+**activities** ストア:
+```
+id           (autoIncrement)
+started_at   TEXT     -- 開始日時 ISO8601
+ended_at     TEXT     -- 終了日時
+distance_m   REAL     -- 距離 (m)
+duration_sec INTEGER  -- 時間 (秒)
+polyline     ARRAY    -- [[lat,lng,elapsedSec],...]
+memo         TEXT     -- 一言メモ
+route_name   TEXT     -- ルート名
+avg_speed    REAL     -- 平均速度 m/s
+max_speed    REAL     -- 最高速度 m/s
+synced       INTEGER  -- 0=未同期, 1=同期済
 ```
 
-### activities
-```sql
-started_at     TEXT     -- 開始日時 ISO8601
-ended_at       TEXT     -- 終了日時
-distance_m     REAL     -- 距離 (m)
-duration_sec   INTEGER  -- 時間 (秒)
-polyline       TEXT     -- JSON [[lat,lng,elapsedSec],...]
-memo           TEXT     -- 一言メモ
-route_name     TEXT     -- ルート名
-avg_speed      REAL     -- 平均速度 m/s
-max_speed      REAL     -- 最高速度 m/s
+**milestones** ストア (keyPath: type):
 ```
-
-### milestones
-```sql
 type              TEXT     -- 'distance_10km' 等
 threshold_m       REAL     -- 基準値 (m)
 reached_at        TEXT     -- 到達日時
@@ -129,18 +157,25 @@ total_duration_sec INTEGER -- 到達時の累計時間
 total_activities  INTEGER  -- 到達時の累計回数
 ```
 
+**meta** ストア (keyPath: key):
+```
+key = 'user_stats'
+total_distance_m, total_duration_sec, total_activities,
+activity_days, first_activity_at, last_activity_at
+```
+
 ## API仕様
 
-| Method | Path | 説明 |
-|--------|------|------|
-| GET | `/api/stats` | ユーザー統計 |
-| GET | `/api/activities?period=&limit=` | 一覧（period: week/month/year/all） |
-| GET | `/api/activities/:id` | 詳細 |
-| POST | `/api/activities` | 記録保存 + マイルストーン判定 |
-| PATCH | `/api/activities/:id` | メモ/ルート名更新 |
-| GET | `/api/milestones` | マイルストーン一覧 |
-| GET | `/api/review?period=` | ふりかえり集計 |
-| GET | `/api/heatmap?period=` | マイマップ用ルートデータ |
+| Method | Path | 説明 | 用途 |
+|--------|------|------|------|
+| GET | `/api/stats` | ユーザー統計 | サーバーDB参照（オプション） |
+| GET | `/api/activities?period=&limit=` | 一覧 | サーバーDB参照 |
+| POST | `/api/activities` | 記録保存 + マイルストーン判定 | サーバーDB直接保存 |
+| PATCH | `/api/activities/:id` | メモ/ルート名更新 | - |
+| GET | `/api/milestones` | マイルストーン一覧 | サーバーDB参照 |
+| GET | `/api/review?period=` | ふりかえり集計 | サーバーDB参照 |
+| GET | `/api/heatmap?period=` | マイマップ用ルートデータ | サーバーDB参照 |
+| **POST** | **`/api/sync`** | **デバイスからバックグラウンド同期** | **IndexedDB→D1** |
 
 ## 画面構成 (IA)
 
@@ -148,6 +183,7 @@ total_activities  INTEGER  -- 到達時の累計回数
 ┌─────────────────────────────┐
 │                             │
 │      Page Content           │
+│  (IndexedDB から直接読み出し) │
 │                             │
 ├─────────────────────────────┤
 │  記録  │ 地図 │ 振返│ 比較  │  ← 下部タブバー
@@ -158,8 +194,8 @@ total_activities  INTEGER  -- 到達時の累計回数
 
 ```bash
 npm install
-npm run db:migrate:local   # D1マイグレーション
-npm run db:seed            # サンプルデータ投入
+npm run db:migrate:local   # D1マイグレーション（サーバー側）
+npm run db:seed            # D1サンプルデータ
 npm run build              # Viteビルド
 pm2 start ecosystem.config.cjs  # 開発サーバー
 # → http://localhost:3000
@@ -171,18 +207,19 @@ pm2 start ecosystem.config.cjs  # 開発サーバー
 webapp/
 ├── src/
 │   ├── index.tsx          # Hono app エントリ + SPA shell
-│   ├── api.ts             # 全APIルート
-│   └── renderer.tsx       # HTML shell (PWA meta tags)
+│   ├── api.ts             # 全APIルート（同期含む）
+│   └── renderer.tsx       # HTML shell (db.js → app.js 読込順)
 ├── public/static/
-│   ├── app.js             # SPA controller (28KB)
+│   ├── db.js              # IndexedDB ラッパー (window.DB)
+│   ├── app.js             # SPA controller (32KB)
 │   ├── style.css          # PWA-first CSS
-│   ├── sw.js              # Service Worker
+│   ├── sw.js              # Service Worker (v2, db.js キャッシュ対応)
 │   ├── manifest.json      # PWA manifest
 │   ├── icon.svg           # App icon
 │   └── icon-{192,512}.png # PWA icons
 ├── migrations/
 │   └── 0001_initial_schema.sql
-├── seed.sql               # サンプルデータ
+├── seed.sql               # サンプルデータ（サーバーDB用）
 ├── ecosystem.config.cjs   # PM2設定
 ├── wrangler.jsonc         # Cloudflare設定
 ├── vite.config.ts
@@ -198,6 +235,13 @@ webapp/
 2. **自己比較のみ**: 他人ランキングなし。「やった自分 vs やらなかった自分」だけ。
 3. **情緒的演出**: マイルストーン到達時の対比表示で「止まらなかった事実」を祝う。
 
+### Local-First 設計の理由
+
+- **プライバシー**: 位置情報は個人データ。デバイスに閉じる方が安全
+- **速度**: ネットワーク往復なしで全操作が瞬時
+- **オフライン**: 電波の届かない場所でも記録・閲覧が可能
+- **データ主権**: ユーザー自身がエクスポート/インポートでデータを完全管理
+
 ### 地図が育つ仕組み
 
 - 1回目: 薄い細い線 → 同じ道を歩くたび **太く・濃く** なる
@@ -209,4 +253,5 @@ webapp/
 
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 開発環境で動作中
+- **データ保存**: デバイスローカル (IndexedDB) がプライマリ
 - **最終更新**: 2026-02-15

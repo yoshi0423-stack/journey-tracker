@@ -232,6 +232,66 @@ apiRoutes.get('/heatmap', async (c) => {
 })
 
 // ============================================================
+// POST /api/sync  - デバイスからのバックグラウンド同期
+// ============================================================
+apiRoutes.post('/sync', async (c) => {
+  const DB = c.env.DB
+  try {
+    const body = await c.req.json<{ activities: any[] }>()
+    const activities = body.activities || []
+    let synced = 0
+
+    for (const a of activities) {
+      const avgSpeed = a.duration_sec > 0 ? a.distance_m / a.duration_sec : 0
+      // started_at で重複チェック
+      const existing = await DB.prepare('SELECT id FROM activities WHERE started_at=? AND distance_m=?')
+        .bind(a.started_at, a.distance_m).first()
+      if (existing) { synced++; continue }
+
+      await DB.prepare(`
+        INSERT INTO activities (started_at, ended_at, distance_m, duration_sec, polyline, memo, route_name, avg_speed, max_speed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        a.started_at, a.ended_at,
+        a.distance_m || 0, a.duration_sec || 0,
+        typeof a.polyline === 'string' ? a.polyline : JSON.stringify(a.polyline || []),
+        a.memo || null, a.route_name || null,
+        avgSpeed, a.max_speed || 0
+      ).run()
+      synced++
+    }
+
+    // user_stats 再計算
+    if (synced > 0) {
+      const totals = await DB.prepare(`
+        SELECT COUNT(*) as cnt, COALESCE(SUM(distance_m),0) as dist, COALESCE(SUM(duration_sec),0) as dur,
+               COUNT(DISTINCT DATE(started_at)) as days, MIN(started_at) as first_at, MAX(started_at) as last_at
+        FROM activities
+      `).first<any>()
+      await DB.prepare(`
+        UPDATE user_stats SET total_distance_m=?, total_duration_sec=?, total_activities=?,
+               activity_days=?, first_activity_at=?, last_activity_at=?, updated_at=datetime('now') WHERE id=1
+      `).bind(totals.dist, totals.dur, totals.cnt, totals.days, totals.first_at, totals.last_at).run()
+
+      // マイルストーン再判定
+      for (const ms of MILESTONES) {
+        if (totals.dist >= ms.threshold) {
+          const exists = await DB.prepare('SELECT id FROM milestones WHERE type=?').bind(ms.type).first()
+          if (!exists) {
+            await DB.prepare(`
+              INSERT INTO milestones (type, threshold_m, reached_at, total_distance_m, total_duration_sec, total_activities)
+              VALUES (?, ?, datetime('now'), ?, ?, ?)
+            `).bind(ms.type, ms.threshold, totals.dist, totals.dur, totals.cnt).run()
+          }
+        }
+      }
+    }
+
+    return c.json({ ok: true, synced })
+  } catch (e) { return c.json({ ok: false, error: String(e) }, 500) }
+})
+
+// ============================================================
 // Haversine (meters)
 // ============================================================
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {

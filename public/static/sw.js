@@ -1,7 +1,8 @@
-const CACHE = 'journey-v1';
+const CACHE = 'journey-v2';
 const PRECACHE = [
   '/',
   '/static/style.css',
+  '/static/db.js',
   '/static/app.js',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
