@@ -147,7 +147,6 @@ body { display: flex; flex-direction: column; }
 /* ---------- Utility ---------- */
 .fade-in { animation: fadeIn .4s ease; }
 @keyframes fadeIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: none; } }
-.text-gradient { background: linear-gradient(90deg,#4f46e5,#7c3aed); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .pulse { animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
@@ -190,3 +189,26 @@ body { display: flex; flex-direction: column; }
 }
 @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(-20px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
 @keyframes toastOut { to { opacity:0; transform: translateX(-50%) translateY(-20px); } }
+
+/* ---------- Onboarding ---------- */
+.onboarding { overflow-y: auto; -webkit-overflow-scrolling: touch; height: 100vh; padding-bottom: 40px; }
+.ob-q { animation: fadeIn .4s ease both; }
+.likert-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: 2px solid #e2e8f0;
+  background: #fff; font-size: 14px; font-weight: 700; color: var(--muted);
+  cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center;
+}
+.likert-btn:hover { border-color: var(--primary); color: var(--primary); }
+.likert-btn.selected { background: var(--primary); color: #fff; border-color: var(--primary); transform: scale(1.1); }
+
+/* ---------- Map legend line ---------- */
+.legend-line {
+  display: inline-block; width: 20px; height: 4px; border-radius: 2px;
+  background: var(--primary); margin-right: 4px; vertical-align: middle;
+}
+
+/* ---------- Dynamic gradient text ---------- */
+.text-gradient {
+  background: linear-gradient(90deg, var(--gradient-from, #4f46e5), var(--gradient-to, #7c3aed));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}

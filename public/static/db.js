@@ -1,13 +1,12 @@
 /* ===================================================================
-   Journey Tracker – IndexedDB Local Storage Layer (db.js)
+   Journey Tracker – IndexedDB Local Storage Layer (db.js) v2
    
    デバイスローカルに全データを永続化する。
-   サーバーAPIはオプショナルなバックグラウンド同期先。
-   ネットワーク接続不要で全機能が動作する。
+   v2: personality プロフィール永続化を追加
    =================================================================== */
 
 const DB_NAME = 'JourneyTracker';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let _db = null;
 
 // ─── DB Open ────────────────────────────────────────
@@ -27,12 +26,17 @@ function openDB() {
 
       // milestones: 節目到達
       if (!db.objectStoreNames.contains('milestones')) {
-        const store = db.createObjectStore('milestones', { keyPath: 'type' });
+        db.createObjectStore('milestones', { keyPath: 'type' });
       }
 
       // meta: key-value (stats等)
       if (!db.objectStoreNames.contains('meta')) {
         db.createObjectStore('meta', { keyPath: 'key' });
+      }
+
+      // v2: profile: 性格診断結果・パーソナライズ設定
+      if (!db.objectStoreNames.contains('profile')) {
+        db.createObjectStore('profile', { keyPath: 'key' });
       }
     };
     req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
@@ -68,21 +72,73 @@ function cursorAll(store, indexName, range, direction = 'prev') {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Profile (性格プロフィール永続化)
+// ═══════════════════════════════════════════════════════════════
+
+/** プロフィール保存 */
+async function saveProfile(profileData) {
+  const record = {
+    key: 'personality',
+    ...profileData,
+    updated_at: new Date().toISOString(),
+  };
+  const store = await tx('profile', 'readwrite');
+  await req2p(store.put(record));
+  return record;
+}
+
+/** プロフィール取得 */
+async function getProfile() {
+  const store = await tx('profile');
+  return await req2p(store.get('personality'));
+}
+
+/** プロフィール存在確認 */
+async function hasProfile() {
+  const p = await getProfile();
+  return !!p && !!p.mbti;
+}
+
+/** プロフィール削除 (やり直し用) */
+async function clearProfile() {
+  const store = await tx('profile', 'readwrite');
+  await req2p(store.delete('personality'));
+}
+
+/** カスタマイズ進化ログ保存 */
+async function saveEvolutionLog(entry) {
+  const store = await tx('profile');
+  const existing = await req2p(store.get('evolution_log'));
+  const log = existing ? existing.entries : [];
+  log.push({ ...entry, timestamp: new Date().toISOString() });
+  // 最新50件まで保持
+  if (log.length > 50) log.splice(0, log.length - 50);
+  const writeStore = await tx('profile', 'readwrite');
+  await req2p(writeStore.put({ key: 'evolution_log', entries: log }));
+}
+
+/** カスタマイズ進化ログ取得 */
+async function getEvolutionLog() {
+  const store = await tx('profile');
+  const data = await req2p(store.get('evolution_log'));
+  return data ? data.entries : [];
+}
+
+
+// ═══════════════════════════════════════════════════════════════
 // Activities CRUD
 // ═══════════════════════════════════════════════════════════════
 
 /** 記録を保存し、stats + milestone を更新して返す */
 async function saveActivity(data) {
-  // data: { started_at, ended_at, distance_m, duration_sec, polyline, memo, route_name }
   const record = {
     ...data,
     polyline: data.polyline || [],
     avg_speed: data.duration_sec > 0 ? data.distance_m / data.duration_sec : 0,
     created_at: new Date().toISOString(),
-    synced: 0,   // 0 = 未同期
+    synced: 0,
   };
 
-  // maxSpeed 計算
   let maxSpeed = 0;
   const pts = record.polyline;
   for (let i = 1; i < pts.length; i++) {
@@ -97,11 +153,29 @@ async function saveActivity(data) {
   const store = await tx('activities', 'readwrite');
   const id = await req2p(store.add(record));
 
-  // stats 再計算
   await recalcStats();
-
-  // milestone 判定
   const newMs = await checkMilestones(id);
+
+  // プロフィールのtotalActivitiesも更新
+  const profile = await getProfile();
+  if (profile) {
+    const stats = await getStats();
+    profile.totalActivities = stats.total_activities;
+    await saveProfile(profile);
+    // 進化ログ記録（レベルアップ時）
+    if (window.Personality) {
+      const levelInfo = window.Personality.calcLevel(stats.total_activities);
+      const prevLevel = window.Personality.calcLevel(stats.total_activities - 1);
+      if (levelInfo.level > prevLevel.level) {
+        await saveEvolutionLog({
+          type: 'level_up',
+          level: levelInfo.level,
+          title: levelInfo.title,
+          unlocks: levelInfo.unlocks,
+        });
+      }
+    }
+  }
 
   return { activity_id: id, new_milestones: newMs };
 }
@@ -112,7 +186,6 @@ async function getActivities(opts = {}) {
   const store = await tx('activities');
   let all = await cursorAll(store, 'started_at', null, 'prev');
 
-  // 期間フィルタ
   if (period !== 'all') {
     const now = new Date();
     let since;
@@ -128,13 +201,11 @@ async function getActivities(opts = {}) {
   return all.slice(0, limit);
 }
 
-/** 単体取得 */
 async function getActivity(id) {
   const store = await tx('activities');
   return req2p(store.get(id));
 }
 
-/** メモ / ルート名更新 */
 async function updateActivity(id, patch) {
   const store = await tx('activities', 'readwrite');
   const record = await req2p(store.get(id));
@@ -146,7 +217,6 @@ async function updateActivity(id, patch) {
   return record;
 }
 
-/** アクティビティ削除 */
 async function deleteActivity(id) {
   const store = await tx('activities', 'readwrite');
   await req2p(store.delete(id));
@@ -155,15 +225,14 @@ async function deleteActivity(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Stats (ローカル再計算)
+// Stats
 // ═══════════════════════════════════════════════════════════════
 
 async function recalcStats() {
   const store = await tx('activities');
   const all = await cursorAll(store, null, null, 'next');
 
-  let total_distance_m = 0;
-  let total_duration_sec = 0;
+  let total_distance_m = 0, total_duration_sec = 0;
   let total_activities = all.length;
   const daySet = new Set();
   let first = null, last = null;
@@ -179,12 +248,9 @@ async function recalcStats() {
 
   const stats = {
     key: 'user_stats',
-    total_distance_m,
-    total_duration_sec,
-    total_activities,
+    total_distance_m, total_duration_sec, total_activities,
     activity_days: daySet.size,
-    first_activity_at: first,
-    last_activity_at: last,
+    first_activity_at: first, last_activity_at: last,
     updated_at: new Date().toISOString(),
   };
 
@@ -204,7 +270,7 @@ async function getStats() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Milestones (ローカル判定)
+// Milestones
 // ═══════════════════════════════════════════════════════════════
 
 const MILESTONE_DEFS = [
@@ -218,15 +284,13 @@ const MILESTONE_DEFS = [
 async function checkMilestones(activityId) {
   const stats = await getStats();
   const newMs = [];
-
   for (const def of MILESTONE_DEFS) {
     if (stats.total_distance_m >= def.threshold) {
       const msStore = await tx('milestones');
       const existing = await req2p(msStore.get(def.type));
       if (!existing) {
         const ms = {
-          type: def.type,
-          threshold_m: def.threshold,
+          type: def.type, threshold_m: def.threshold,
           reached_at: new Date().toISOString(),
           total_distance_m: stats.total_distance_m,
           total_duration_sec: stats.total_duration_sec,
@@ -243,7 +307,6 @@ async function checkMilestones(activityId) {
 }
 
 async function recheckAllMilestones() {
-  // stats が減った場合にマイルストーンを削除
   const stats = await getStats();
   for (const def of MILESTONE_DEFS) {
     if (stats.total_distance_m < def.threshold) {
@@ -260,7 +323,7 @@ async function getMilestones() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Review (ローカル集計)
+// Review
 // ═══════════════════════════════════════════════════════════════
 
 async function getReview(period = 'week') {
@@ -274,46 +337,31 @@ async function getReview(period = 'week') {
   const all = await cursorAll(store, 'started_at', null, 'next');
   const filtered = all.filter(a => a.started_at >= sinceISO);
 
-  // 集計
   let total_distance_m = 0, total_duration_sec = 0;
-  const hourMap = {};
-  const dayMap = {};
+  const hourMap = {}, dayMap = {};
 
   for (const a of filtered) {
     total_distance_m += a.distance_m || 0;
     total_duration_sec += a.duration_sec || 0;
-
     const dt = new Date(a.started_at);
-    const h = dt.getHours();
-    hourMap[h] = (hourMap[h] || 0) + 1;
-
+    hourMap[dt.getHours()] = (hourMap[dt.getHours()] || 0) + 1;
     const day = a.started_at.slice(0, 10);
     dayMap[day] = (dayMap[day] || 0) + (a.distance_m || 0);
   }
 
-  const hour_distribution = Object.entries(hourMap)
-    .map(([h, cnt]) => ({ hour: parseInt(h), cnt }))
-    .sort((a, b) => a.hour - b.hour);
-
-  const daily = Object.entries(dayMap)
-    .map(([day, dist]) => ({ day, dist }))
-    .sort((a, b) => a.day.localeCompare(b.day));
-
   return {
     period,
     summary: {
-      count: filtered.length,
-      total_distance_m,
-      total_duration_sec,
+      count: filtered.length, total_distance_m, total_duration_sec,
       avg_distance_m: filtered.length > 0 ? total_distance_m / filtered.length : 0,
     },
-    hour_distribution,
-    daily,
+    hour_distribution: Object.entries(hourMap).map(([h, cnt]) => ({ hour: parseInt(h), cnt })).sort((a, b) => a.hour - b.hour),
+    daily: Object.entries(dayMap).map(([day, dist]) => ({ day, dist })).sort((a, b) => a.day.localeCompare(b.day)),
   };
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Heatmap (ローカル)
+// Heatmap
 // ═══════════════════════════════════════════════════════════════
 
 async function getHeatmapRoutes(period = 'all') {
@@ -334,37 +382,40 @@ async function exportAllData() {
   const activities = await getActivities({ period: 'all', limit: 99999 });
   const milestones = await getMilestones();
   const stats = await getStats();
+  const profile = await getProfile();
+  const evolutionLog = await getEvolutionLog();
   return {
-    version: 1,
+    version: 2,
     exported_at: new Date().toISOString(),
-    stats,
-    milestones,
-    activities,
+    stats, milestones, activities,
+    profile, evolutionLog,
   };
 }
 
 async function importData(json) {
-  // 全クリアしてからインポート
   await clearAllData();
-
   if (json.activities && Array.isArray(json.activities)) {
     for (const a of json.activities) {
       const store = await tx('activities', 'readwrite');
-      // IDを保持してインポート
       const record = { ...a, synced: 0 };
-      delete record.id;   // autoIncrement に任せる
+      delete record.id;
       await req2p(store.add(record));
     }
   }
-
-  // stats & milestones を再計算
   await recalcStats();
-  // milestones もインポートデータから復元
   if (json.milestones && Array.isArray(json.milestones)) {
     for (const ms of json.milestones) {
       const store = await tx('milestones', 'readwrite');
       await req2p(store.put(ms));
     }
+  }
+  // v2: プロフィール復元
+  if (json.profile) {
+    await saveProfile(json.profile);
+  }
+  if (json.evolutionLog && Array.isArray(json.evolutionLog)) {
+    const writeStore = await tx('profile', 'readwrite');
+    await req2p(writeStore.put({ key: 'evolution_log', entries: json.evolutionLog }));
   }
 }
 
@@ -375,10 +426,18 @@ async function clearAllData() {
   await req2p(msStore.clear());
   const metaStore = await tx('meta', 'readwrite');
   await req2p(metaStore.clear());
+  // プロフィールはクリアしない（性格診断は残す）
+}
+
+/** 全データ完全削除（プロフィール含む） */
+async function clearEverything() {
+  await clearAllData();
+  const profileStore = await tx('profile', 'readwrite');
+  await req2p(profileStore.clear());
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Server Sync (オプショナル・バックグラウンド)
+// Server Sync
 // ═══════════════════════════════════════════════════════════════
 
 async function syncToServer() {
@@ -386,15 +445,12 @@ async function syncToServer() {
     const store = await tx('activities');
     const all = await cursorAll(store, 'synced', IDBKeyRange.only(0), 'next');
     if (all.length === 0) return { synced: 0 };
-
     const res = await fetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activities: all }),
     });
-
     if (res.ok) {
-      // synced フラグ更新
       for (const a of all) {
         const ws = await tx('activities', 'readwrite');
         a.synced = 1;
@@ -404,12 +460,11 @@ async function syncToServer() {
     }
     return { synced: 0, error: 'server error' };
   } catch (e) {
-    // オフラインでも問題なし
     return { synced: 0, error: 'offline' };
   }
 }
 
-// ─── Haversine (meters) ─────────────────────────────
+// ─── Haversine ─────────────────────────────
 function haversineLocal(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -420,20 +475,20 @@ function haversineLocal(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ─── Public API (window.DB) ─────────────────────────
+// ─── Public API ─────────────────────────
 window.DB = {
   open: openDB,
-  saveActivity,
-  getActivities,
-  getActivity,
-  updateActivity,
-  deleteActivity,
-  getStats,
-  getMilestones,
-  getReview,
-  getHeatmapRoutes,
-  exportAllData,
-  importData,
-  clearAllData,
+  // Profile
+  saveProfile, getProfile, hasProfile, clearProfile,
+  saveEvolutionLog, getEvolutionLog,
+  // Activities
+  saveActivity, getActivities, getActivity, updateActivity, deleteActivity,
+  // Stats & Milestones
+  getStats, getMilestones,
+  // Review & Heatmap
+  getReview, getHeatmapRoutes,
+  // Data management
+  exportAllData, importData, clearAllData, clearEverything,
+  // Sync
   syncToServer,
 };

@@ -22,6 +22,7 @@ export const renderer = jsxRenderer(({ children }) => {
       <body class="bg-gray-50 text-gray-800 overscroll-none">
         {children}
         <script src="/static/db.js"></script>
+        <script src="/static/personality.js"></script>
         <script src="/static/app.js"></script>
       </body>
     </html>
