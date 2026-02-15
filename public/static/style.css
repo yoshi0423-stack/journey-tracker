@@ -201,6 +201,66 @@ body { display: flex; flex-direction: column; }
 .likert-btn:hover { border-color: var(--primary); color: var(--primary); }
 .likert-btn.selected { background: var(--primary); color: #fff; border-color: var(--primary); transform: scale(1.1); }
 
+/* ---------- Start Record Button (prominent) ---------- */
+.start-record-wrapper {
+  width: 100%; max-width: 320px; margin: 0 auto;
+}
+.start-record-hint {
+  font-size: 13px; font-weight: 600; color: var(--primary);
+  margin-bottom: 8px; line-height: 1.5;
+  animation: fadeIn .4s ease;
+}
+.btn-start-record-main {
+  width: 100%; padding: 20px 24px; font-size: 20px;
+  border-radius: 24px; gap: 12px;
+  box-shadow: 0 6px 24px rgba(79,70,229,.35);
+  animation: recordBtnPulse 2.5s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+.btn-start-record-main::after {
+  content: ''; position: absolute; inset: 0;
+  border-radius: 24px;
+  border: 2px solid rgba(255,255,255,.4);
+  animation: recordBtnRing 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.start-record-icon-ring {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  font-size: 18px;
+}
+@keyframes recordBtnPulse {
+  0%, 100% { box-shadow: 0 6px 24px rgba(79,70,229,.35); transform: scale(1); }
+  50% { box-shadow: 0 8px 32px rgba(79,70,229,.5); transform: scale(1.02); }
+}
+@keyframes recordBtnRing {
+  0%, 100% { opacity: .3; }
+  50% { opacity: .7; }
+}
+
+/* ---------- Confirm Modal ---------- */
+.confirm-modal {
+  position: fixed; inset: 0; z-index: 2500;
+  background: rgba(0,0,0,.5);
+  display: none; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+.confirm-modal.show { display: flex; }
+.confirm-sheet {
+  width: 100%; max-width: 500px; background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 32px 24px calc(var(--safe-b) + 24px);
+  animation: slideUp .3s ease;
+}
+.confirm-icon-ring {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #fef2f2; color: var(--danger);
+  font-size: 24px; margin-bottom: 12px;
+}
+
 /* ---------- Map legend line ---------- */
 .legend-line {
   display: inline-block; width: 20px; height: 4px; border-radius: 2px;

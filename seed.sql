@@ -59,5 +59,5 @@ WHERE id = 1;
 INSERT INTO milestones (type, threshold_m, reached_at, total_distance_m, total_duration_sec, total_activities, activity_id) VALUES
 ('distance_10km', 10000, datetime('now', '-15 days', '+7 hours'), 18640, 8520, 4, 4);
 
-INSERT INTO milestones (type, threshold_m, reached_at, total_distance_m, total_duration_sec, total_activities, activity_id) VALUES
-('distance_20km', 20000, datetime('now', '-5 days', '+7 hours'), 25690, 11520, 6, 6);
+-- Note: distance_20km is not in MILESTONE_DEFS (next is 50km)
+-- Removed invalid milestone entry

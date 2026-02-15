@@ -291,9 +291,13 @@ async function renderRecordPage() {
       </div>` : ''}
 
       <div style="text-align:center;margin:20px 0">
-        <button class="btn-primary" style="width:100%;max-width:320px;padding:18px;font-size:18px;border-radius:20px" id="btn-start-record">
-          <i class="fas fa-location-arrow"></i> ${mbti ? pick(p.startMessages) : '記録をはじめる'}
-        </button>
+        <div class="start-record-wrapper">
+          ${mbti ? `<div class="start-record-hint">${pick(p.startMessages)}</div>` : ''}
+          <button class="btn-primary btn-start-record-main" id="btn-start-record">
+            <span class="start-record-icon-ring"><i class="fas fa-person-walking"></i></span>
+            <span>記録をはじめる</span>
+          </button>
+        </div>
       </div>
 
       <div class="card">
@@ -358,17 +362,59 @@ async function handleImport(e) {
       S.personalization = Personality.getPersonalization({ ...S.profile, totalActivities: (await DB.getStats()).total_activities });
       Personality.applyTheme(S.personalization);
     }
-    alert(`${json.activities.length}件の記録をインポートしました`);
+    showToast(`${json.activities.length}件の記録をインポートしました ✓`);
     renderRecordPage();
-  } catch (err) { alert('インポートに失敗しました: ' + err.message); }
+  } catch (err) { showToast('インポート失敗: ' + err.message); }
   e.target.value = '';
 }
 async function handleClear() {
-  if (!confirm('全てのデータを削除しますか？\nこの操作は取り消せません。')) return;
-  if (!confirm('本当に削除しますか？\n先にエクスポートすることをお勧めします。')) return;
-  await DB.clearAllData();
-  alert('全データを削除しました');
-  renderRecordPage();
+  showConfirmModal({
+    title: '全データを削除',
+    message: '記録・統計・マイルストーンなど、すべてのデータが完全に削除されます。この操作は取り消せません。',
+    warning: '先にエクスポートすることをお勧めします。',
+    confirmLabel: '削除する',
+    cancelLabel: 'キャンセル',
+    onConfirm: async () => {
+      await DB.clearAllData();
+      showToast('全データを削除しました');
+      renderRecordPage();
+    }
+  });
+}
+
+// ─── Confirm modal ───
+function showConfirmModal({ title, message, warning, confirmLabel, cancelLabel, onConfirm }) {
+  const existing = document.getElementById('confirm-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'confirm-modal';
+  modal.className = 'confirm-modal show';
+  modal.innerHTML = `
+    <div class="confirm-sheet">
+      <div style="text-align:center;margin-bottom:20px">
+        <div class="confirm-icon-ring"><i class="fas fa-triangle-exclamation"></i></div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px">${title}</div>
+        <div style="font-size:14px;color:var(--muted);line-height:1.6">${message}</div>
+        ${warning ? `<div style="margin-top:10px;padding:10px 14px;background:#fef2f2;border-radius:10px;font-size:13px;color:var(--danger);font-weight:600"><i class="fas fa-circle-info" style="margin-right:4px"></i>${warning}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" style="flex:1;color:var(--text);border:1.5px solid #e2e8f0;background:#fff" id="confirm-cancel">${cancelLabel}</button>
+        <button class="btn-primary btn-danger" style="flex:1" id="confirm-ok">${confirmLabel}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('confirm-cancel').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  document.getElementById('confirm-ok').addEventListener('click', async () => {
+    const btn = document.getElementById('confirm-ok');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 削除中...';
+    await onConfirm();
+    modal.remove();
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -828,12 +874,19 @@ async function renderProfilePage() {
     renderOnboarding();
   });
 
-  document.getElementById('btn-reset-all').addEventListener('click', async () => {
-    if (!confirm('全データとプロフィールを完全に削除しますか？')) return;
-    if (!confirm('本当に削除しますか？この操作は取り消せません。')) return;
-    await DB.clearEverything();
-    S.profile = null; S.personalization = null;
-    location.reload();
+  document.getElementById('btn-reset-all').addEventListener('click', () => {
+    showConfirmModal({
+      title: '全データ+プロフィールを完全削除',
+      message: '記録データ・性格診断・プロフィールなど、すべてが完全に削除されます。アプリは初期状態に戻ります。',
+      warning: 'この操作は取り消せません。事前にデータをエクスポートしてください。',
+      confirmLabel: '完全に削除する',
+      cancelLabel: 'キャンセル',
+      onConfirm: async () => {
+        await DB.clearEverything();
+        S.profile = null; S.personalization = null;
+        location.reload();
+      }
+    });
   });
 }
 
@@ -896,6 +949,17 @@ function fmtDuration(sec) { const h = Math.floor(sec / 3600); const m = Math.flo
 function fmtDurationShort(sec) { const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = sec % 60; return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; }
 function fmtDate(iso) { if (!iso) return ''; const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ─── Toast notification ───
+function showToast(msg, duration = 3000) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
 
 // ─── SW ───
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js').catch(() => {});
