@@ -1,4 +1,4 @@
-const CACHE = 'journey-v3';
+const CACHE = 'journey-v4';
 const PRECACHE = [
   '/',
   '/static/style.css',

@@ -12,7 +12,8 @@ export const renderer = jsxRenderer(({ children }) => {
         <title>Journey Tracker</title>
         <link rel="manifest" href="/static/manifest.json" />
         <link rel="icon" type="image/svg+xml" href="/static/icon.svg" />
-        <link rel="apple-touch-icon" href="/static/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/static/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/static/icon-512.png" />
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
