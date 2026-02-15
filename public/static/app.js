@@ -1,7 +1,8 @@
 /* ===================================================================
-   Journey Tracker – SPA Controller v3
-   全データ: IndexedDB (window.DB)
+   Journey Tracker – SPA Controller v4
+   全データ: サーバーAPI (window.DB)
    性格パーソナライズ: window.Personality
+   認証: アカウントベース
    =================================================================== */
 
 // ─── State ───
@@ -17,9 +18,29 @@ const S = {
   personalization: null,
 };
 
+// ─── Auth expired callback ───
+window.__onAuthExpired = () => {
+  showToast('セッションが切れました。再ログインしてください');
+  setTimeout(() => renderAuthScreen(), 500);
+};
+
 // ─── Boot ───
 document.addEventListener('DOMContentLoaded', async () => {
   await DB.open();
+  if (!DB.isLoggedIn()) {
+    renderAuthScreen();
+    return;
+  }
+  // ログイン済み → ユーザー情報チェック
+  const me = await DB.getMe();
+  if (!me) {
+    renderAuthScreen();
+    return;
+  }
+  await bootApp();
+});
+
+async function bootApp() {
   S.profile = await DB.getProfile();
   if (S.profile && S.profile.mbti) {
     S.personalization = Personality.getPersonalization({
@@ -32,13 +53,116 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     renderOnboarding();
   }
-  DB.syncToServer().catch(() => {});
-});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Auth Screen: ログイン / サインアップ
+// ═══════════════════════════════════════════════════════════════
+function renderAuthScreen() {
+  // タブバーを隠す
+  const oldBar = document.getElementById('tab-bar');
+  if (oldBar) oldBar.remove();
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="auth-screen">
+      <div class="auth-header">
+        <div style="font-size:48px;margin-bottom:8px">🧭</div>
+        <div style="font-size:24px;font-weight:900;margin-bottom:4px">Journey Tracker</div>
+        <div style="font-size:14px;color:var(--muted);line-height:1.6">あなたの歩みを記録し<br>時間とともに深まる資産を築こう</div>
+      </div>
+      
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-mode="login">ログイン</button>
+        <button class="auth-tab" data-mode="signup">新規登録</button>
+      </div>
+
+      <form id="auth-form" class="auth-form">
+        <div id="auth-name-field" style="display:none">
+          <label class="auth-label">表示名</label>
+          <input type="text" id="auth-name" placeholder="ニックネーム（任意）" class="auth-input" autocomplete="name" />
+        </div>
+        <div>
+          <label class="auth-label">メールアドレス</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" class="auth-input" required autocomplete="email" />
+        </div>
+        <div>
+          <label class="auth-label">パスワード</label>
+          <input type="password" id="auth-password" placeholder="6文字以上" class="auth-input" required minlength="6" autocomplete="current-password" />
+        </div>
+        <div id="auth-error" class="auth-error" style="display:none"></div>
+        <button type="submit" class="btn-primary auth-submit" id="auth-submit">
+          ログイン
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <div style="font-size:12px;color:var(--muted);line-height:1.5">
+          アカウントに保存されるので<br>どのデバイスからでもアクセスできます
+        </div>
+      </div>
+    </div>
+  `;
+
+  let authMode = 'login';
+
+  // タブ切り替え
+  app.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      authMode = tab.dataset.mode;
+      app.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === authMode));
+      document.getElementById('auth-name-field').style.display = authMode === 'signup' ? 'block' : 'none';
+      document.getElementById('auth-submit').textContent = authMode === 'login' ? 'ログイン' : 'アカウント作成';
+      document.getElementById('auth-password').autocomplete = authMode === 'login' ? 'current-password' : 'new-password';
+      document.getElementById('auth-error').style.display = 'none';
+    });
+  });
+
+  // フォーム送信
+  document.getElementById('auth-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const name = document.getElementById('auth-name').value.trim();
+    const errEl = document.getElementById('auth-error');
+    const btn = document.getElementById('auth-submit');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
+    errEl.style.display = 'none';
+
+    try {
+      let res;
+      if (authMode === 'login') {
+        res = await DB.login(email, password);
+      } else {
+        res = await DB.signup(email, password, name);
+      }
+      if (res.ok) {
+        await bootApp();
+      } else {
+        errEl.textContent = res.error || 'エラーが発生しました';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = authMode === 'login' ? 'ログイン' : 'アカウント作成';
+      }
+    } catch (err) {
+      errEl.textContent = 'ネットワークエラーが発生しました';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = authMode === 'login' ? 'ログイン' : 'アカウント作成';
+    }
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Onboarding: Big Five 10問診断
 // ═══════════════════════════════════════════════════════════════
 function renderOnboarding() {
+  // タブバーを隠す
+  const oldBar = document.getElementById('tab-bar');
+  if (oldBar) oldBar.remove();
+
   const app = document.getElementById('app');
   const qs = Personality.BIG5_QUESTIONS;
   app.innerHTML = `
@@ -72,7 +196,7 @@ function renderOnboarding() {
         <div class="likert" data-qi="${i}">
           <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px"><span>全く違う</span><span>とても当てはまる</span></div>
           <div style="display:flex;gap:6px;justify-content:center">
-            ${[1,2,3,4,5,6,7].map(v => `<button class="likert-btn" data-v="${v}">${v}</button>`).join('')}
+            ${[1,2,3,4,5,6,7].map(v => `<button type="button" class="likert-btn" data-v="${v}">${v}</button>`).join('')}
           </div>
         </div>
       </div>
@@ -120,7 +244,6 @@ async function finishOnboarding(answers) {
   S.profile = profile;
   S.personalization = Personality.getPersonalization(profile);
 
-  // 結果表示
   showDiagnosisResult(mbti, bigFive, true);
 }
 
@@ -202,7 +325,6 @@ function renderShell() {
     <div id="save-modal"></div>
     <div id="milestone-overlay"></div>
   `;
-  // Remove old tab bar if exists
   const oldBar = document.getElementById('tab-bar');
   if (oldBar) oldBar.remove();
 
@@ -234,11 +356,10 @@ function switchTab(tab) {
   if (tab === 'profile') renderProfilePage();
 }
 
-// Helper: pick random from array
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ═══════════════════════════════════════════════════════════════
-// 1. Record (Home) - パーソナライズ済み
+// 1. Record (Home)
 // ═══════════════════════════════════════════════════════════════
 async function renderRecordPage() {
   const page = document.getElementById('page-record');
@@ -252,6 +373,7 @@ async function renderRecordPage() {
   const lvl = p.levelInfo;
   const mbti = p.mbtiInfo;
   const homeMsg = p.homeMessages;
+  const user = DB.getUser();
 
   page.innerHTML = `
     <div style="padding:16px 16px 0">
@@ -262,7 +384,7 @@ async function renderRecordPage() {
         <div style="font-size:12px;color:var(--muted);margin-top:4px">${acts}回の記録 · ${days}日間の積み重ね</div>
         ${homeMsg.sub ? `<div style="margin-top:6px;font-size:11px;color:var(--muted)">${homeMsg.sub}</div>` : ''}
         <div style="margin-top:8px;display:flex;justify-content:center;gap:8px">
-          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--success);background:#f0fdf4;padding:3px 10px;border-radius:20px"><i class="fas fa-database" style="font-size:9px"></i>デバイスに保存</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--success);background:#f0fdf4;padding:3px 10px;border-radius:20px"><i class="fas fa-cloud-arrow-up" style="font-size:9px"></i>クラウド保存</span>
           <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:${p.theme.primary};background:${p.theme.primary}10;padding:3px 10px;border-radius:20px"><i class="fas fa-star" style="font-size:9px"></i>Lv.${lvl.level} ${lvl.title}</span>
         </div>
       </div>` : `<div class="card" style="text-align:center;padding:28px 20px">
@@ -306,8 +428,8 @@ async function renderRecordPage() {
       </div>
 
       <div class="card" style="margin-top:4px">
-        <div style="font-weight:700;font-size:15px;margin-bottom:12px"><i class="fas fa-hard-drive" style="color:var(--muted);margin-right:6px"></i>データ管理</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">全データはこのデバイスのブラウザに保存されています</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px"><i class="fas fa-cloud" style="color:var(--muted);margin-right:6px"></i>データ管理</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${user ? `<i class="fas fa-user-check" style="color:var(--success)"></i> ${esc(user.email)} でログイン中` : 'クラウドに保存'}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="data-mgmt-btn" id="btn-export"><i class="fas fa-download"></i> エクスポート</button>
           <button class="data-mgmt-btn" id="btn-import"><i class="fas fa-upload"></i> インポート</button>
@@ -332,7 +454,7 @@ async function loadRecentActivities() {
   if (!el) return;
   if (acts.length === 0) { el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">まだ記録がありません</div>'; return; }
   el.innerHTML = acts.map(a => {
-    const d = (a.distance_m / 1000).toFixed(2);
+    const d = ((a.distance_m || 0) / 1000).toFixed(2);
     const t = fmtDuration(a.duration_sec);
     const dt = fmtDate(a.started_at);
     return `<div class="activity-row"><div class="activity-dot"></div><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(a.route_name || a.memo || dt)}</div><div style="font-size:12px;color:var(--muted)">${dt}</div></div><div style="text-align:right"><div style="font-weight:700;font-size:15px">${d} km</div><div style="font-size:12px;color:var(--muted)">${t}</div></div></div>`;
@@ -356,7 +478,6 @@ async function handleImport(e) {
     const json = JSON.parse(await file.text());
     if (!json.activities) throw new Error('invalid format');
     await DB.importData(json);
-    // プロフィールが復元されたら再適用
     S.profile = await DB.getProfile();
     if (S.profile && S.profile.mbti) {
       S.personalization = Personality.getPersonalization({ ...S.profile, totalActivities: (await DB.getStats()).total_activities });
@@ -411,7 +532,7 @@ function showConfirmModal({ title, message, warning, confirmLabel, cancelLabel, 
   document.getElementById('confirm-ok').addEventListener('click', async () => {
     const btn = document.getElementById('confirm-ok');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 削除中...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
     await onConfirm();
     modal.remove();
   });
@@ -486,7 +607,7 @@ function updateTrackingUI() {
 }
 function hideTrackingPanel() { document.getElementById('tracking-panel').classList.remove('open'); }
 
-// ─── Save modal (パーソナライズ済み) ───
+// ─── Save modal ───
 function showSaveModal() {
   const modal = document.getElementById('save-modal');
   const distKm = (S.distance / 1000).toFixed(2);
@@ -507,7 +628,7 @@ function showSaveModal() {
       <textarea id="save-memo" placeholder="ひとことメモ（任意）" rows="2" style="margin-bottom:16px;resize:none"></textarea>
       <div style="display:flex;gap:10px">
         <button class="btn-ghost" style="flex:1;color:var(--text);border-color:#e2e8f0" id="btn-discard">破棄</button>
-        <button class="btn-primary" style="flex:1" id="btn-save"><i class="fas fa-hard-drive"></i> デバイスに保存</button>
+        <button class="btn-primary" style="flex:1" id="btn-save"><i class="fas fa-cloud-arrow-up"></i> 保存</button>
       </div>
     </div>
   `;
@@ -526,6 +647,9 @@ function showSaveModal() {
 }
 
 async function saveActivity() {
+  const btn = document.getElementById('btn-save');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...'; }
+  
   const elapsed = getElapsed();
   const payload = {
     started_at: new Date(S.startTime).toISOString(),
@@ -538,7 +662,6 @@ async function saveActivity() {
   const result = await DB.saveActivity(payload);
   document.getElementById('save-modal').classList.remove('show');
 
-  // パーソナライズ更新（レベルアップ反映）
   const stats = await DB.getStats();
   S.profile = await DB.getProfile();
   if (S.profile) {
@@ -548,7 +671,6 @@ async function saveActivity() {
   if (result.new_milestones && result.new_milestones.length > 0) {
     await showMilestoneOverlay(result.new_milestones[0]);
   }
-  DB.syncToServer().catch(() => {});
   renderRecordPage();
 }
 
@@ -626,7 +748,7 @@ async function loadMyMap() {
 function gridKey(lat, lng) { return `${Math.round(lat * 1000)},${Math.round(lng * 1000)}`; }
 
 // ═══════════════════════════════════════════════════════════════
-// 4. Review (パーソナライズ済み)
+// 4. Review
 // ═══════════════════════════════════════════════════════════════
 async function renderReviewPage() {
   const page = document.getElementById('page-review');
@@ -667,7 +789,6 @@ async function loadReview() {
   const dailyData = daily || [];
   const maxDist = Math.max(...dailyData.map(d => d.dist || 0), 1);
 
-  // 性格ベースのインサイト
   const insightHTML = p.reviewInsights.length > 0 ? `
     <div class="card fade-in" style="border-left:3px solid var(--primary)">
       <div style="font-weight:700;font-size:14px;margin-bottom:8px">あなたへのインサイト</div>
@@ -697,7 +818,7 @@ async function loadReview() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 5. Compare (パーソナライズ済みマイルストーンメッセージ)
+// 5. Compare
 // ═══════════════════════════════════════════════════════════════
 async function renderComparePage() {
   const page = document.getElementById('page-compare');
@@ -743,7 +864,7 @@ async function renderComparePage() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 6. Profile (自分タブ)
+// 6. Profile (自分タブ) + ログアウト
 // ═══════════════════════════════════════════════════════════════
 async function renderProfilePage() {
   const page = document.getElementById('page-profile');
@@ -751,6 +872,7 @@ async function renderProfilePage() {
   const stats = await DB.getStats();
   const p = S.personalization || Personality.getPersonalization(null);
   const log = await DB.getEvolutionLog();
+  const user = DB.getUser();
 
   if (!profile || !profile.mbti) {
     page.innerHTML = `
@@ -773,6 +895,18 @@ async function renderProfilePage() {
   page.innerHTML = `
     <div style="padding:16px">
       <div style="font-weight:800;font-size:18px;margin-bottom:16px"><i class="fas fa-user-gear" style="color:var(--primary);margin-right:6px"></i>自分</div>
+
+      <!-- アカウント情報 -->
+      <div class="card fade-in" style="display:flex;align-items:center;gap:12px">
+        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${mbti.gradientFrom},${mbti.gradientTo});display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0">
+          ${user && user.display_name ? esc(user.display_name.slice(0, 1)) : '<i class="fas fa-user"></i>'}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:15px">${user ? esc(user.display_name || user.email) : ''}</div>
+          <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis">${user ? esc(user.email) : ''}</div>
+        </div>
+        <span style="font-size:11px;color:var(--success);background:#f0fdf4;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap"><i class="fas fa-cloud-arrow-up" style="font-size:9px;margin-right:3px"></i>同期済み</span>
+      </div>
 
       <!-- 性格カード -->
       <div class="card fade-in" style="text-align:center;padding:24px;background:linear-gradient(135deg,${mbti.gradientFrom}08,${mbti.gradientTo}12)">
@@ -856,6 +990,9 @@ async function renderProfilePage() {
           <button class="data-mgmt-btn danger" style="width:100%;justify-content:center" id="btn-reset-all">
             <i class="fas fa-triangle-exclamation"></i> 全データ+プロフィールを完全削除
           </button>
+          <button class="data-mgmt-btn" style="width:100%;justify-content:center;color:var(--muted);border-color:#e2e8f0" id="btn-logout">
+            <i class="fas fa-arrow-right-from-bracket"></i> ログアウト
+          </button>
         </div>
       </div>
     </div>
@@ -866,7 +1003,6 @@ async function renderProfilePage() {
     await DB.clearProfile();
     S.profile = null;
     S.personalization = null;
-    // デフォルトテーマに戻す
     document.documentElement.style.setProperty('--primary', '#4f46e5');
     document.documentElement.style.setProperty('--primary-light', '#818cf8');
     document.documentElement.style.setProperty('--gradient-from', '#4338ca');
@@ -884,14 +1020,27 @@ async function renderProfilePage() {
       onConfirm: async () => {
         await DB.clearEverything();
         S.profile = null; S.personalization = null;
-        location.reload();
+        await bootApp();
       }
     });
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    if (!confirm('ログアウトしますか？')) return;
+    await DB.logout();
+    S.profile = null;
+    S.personalization = null;
+    // テーマをリセット
+    document.documentElement.style.setProperty('--primary', '#4f46e5');
+    document.documentElement.style.setProperty('--primary-light', '#818cf8');
+    document.documentElement.style.setProperty('--gradient-from', '#4338ca');
+    document.documentElement.style.setProperty('--gradient-to', '#6366f1');
+    renderAuthScreen();
   });
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Milestone Overlay (パーソナライズ済み)
+// Milestone Overlay
 // ═══════════════════════════════════════════════════════════════
 async function showMilestoneOverlay(msType) {
   if (S.seenMilestones.includes(msType)) return;
