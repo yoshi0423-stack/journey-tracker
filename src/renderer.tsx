@@ -5,17 +5,22 @@ export const renderer = jsxRenderer(({ children }) => {
     <html lang="ja">
       <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Journey Tracker - あなたの歩みを記録</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#4f46e5" />
+        <title>Journey Tracker</title>
+        <link rel="manifest" href="/static/manifest.json" />
+        <link rel="icon" type="image/svg+xml" href="/static/icon.svg" />
+        <link rel="apple-touch-icon" href="/static/icon-192.png" />
         <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" rel="stylesheet" />
         <link href="/static/style.css" rel="stylesheet" />
       </head>
-      <body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+      <body class="bg-gray-50 text-gray-800 overscroll-none">
         {children}
-        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
         <script src="/static/app.js"></script>
       </body>
     </html>

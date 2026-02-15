@@ -1,268 +1,212 @@
-# 🚶‍♂️ Journey Tracker
+# Journey Tracker
 
-**時間とともに深まる、あなただけの歩みの資産**
+**「情緒 x 時間」で不可逆に育つ個人資産 — 歩みの記録アプリ**
 
-位置情報を使って歩行・走行距離を記録し、使えば使うほど蓄積される情緒的価値を持つパーソナル記録アプリです。
+行動の積み上げを"自信"として可視化し、他人比較をせず  
+「やった自分 vs やらなかった自分」の世界線比較で自己効力感を高めるPWA。
 
 ---
 
-## 🌟 プロジェクト概要
-
-- **名称**: Journey Tracker
-- **コンセプト**: 時間との結びつき × 不可逆的な蓄積 = 情緒的ベネフィット
-- **目的**: 日々の移動を記録し、自分だけの軌跡として資産化する
-
-### 📍 現在の公開URL
+## URLs
 
 - **開発環境**: https://3000-iy3udtaqtne7teh8jv7a3-de59bda9.sandbox.novita.ai
-- **APIエンドポイント**: `/api/stats`, `/api/activities`, `/api/milestones`
 
 ---
 
-## ✨ 完成済み機能
+## アーキテクチャ
 
-### ✅ コア機能
-- **リアルタイム位置情報トラッキング** - Geolocation APIを使用した高精度GPS記録
-- **アクティビティタイプ選択** - ウォーキング、ランニング、サイクリング
-- **距離・時間自動計算** - Haversine公式による正確な距離計測
-- **データ永続化** - Cloudflare D1データベースへの記録保存
-
-### 📊 可視化機能
-- **統計ダッシュボード** - 累計距離、活動日数、累計時間、継続日数
-- **週間活動グラフ** - Chart.jsによる視覚的な週次集計
-- **アクティビティ履歴** - 過去の記録一覧表示
-
-### 🏆 情緒的ベネフィット要素
-- **マイルストーンシステム** - 10km、20km、50km等の達成記録
-- **継続日数カウント** - 初回活動からの経過日数表示
-- **記念日記録** - アクティビティ回数に応じた祝福メッセージ
-- **時間軸との結びつき** - 不可逆的に蓄積される自分だけの履歴
-
----
-
-## 🗄️ データアーキテクチャ
-
-### データモデル
-
-#### 1. **users** - ユーザー情報
-```sql
-- id: ユーザーID
-- username: ユーザー名
-- created_at: 登録日時
-- first_activity_date: 初回活動日
-- total_distance: 累計距離（km）
-- total_duration: 累計時間（秒）
-- activity_days: 活動日数
+```
+┌──────────────────────────────────────────────────────┐
+│  Browser (PWA)                                       │
+│  ┌───────────┬──────────┬──────────┬───────────────┐ │
+│  │  記録     │ マイマップ│ ふりかえり│  パラレル比較  │ │
+│  │  (Home)   │  (Map)   │ (Review) │  (Compare)    │ │
+│  └─────┬─────┴────┬─────┴────┬─────┴────┬──────────┘ │
+│        │ Geolocation API     │ Leaflet + OSM         │
+│        └──────────┬──────────┘                       │
+│                   │ fetch()                           │
+├───────────────────┼──────────────────────────────────┤
+│  Cloudflare Workers (Hono)                           │
+│  ┌────────────────┼──────────────────────────────┐   │
+│  │  /api/stats    │  /api/activities             │   │
+│  │  /api/heatmap  │  /api/milestones             │   │
+│  │  /api/review   │  /api/activities/:id (PATCH) │   │
+│  └────────────────┼──────────────────────────────┘   │
+│                   │                                  │
+│  Cloudflare D1 (SQLite)                              │
+│  ┌────────────────┼──────────────────────────────┐   │
+│  │  user_stats    │  activities  │  milestones   │   │
+│  └────────────────┴─────────────┴────────────────┘   │
+└──────────────────────────────────────────────────────┘
 ```
 
-#### 2. **activities** - アクティビティ記録
+## 技術スタック
+
+| レイヤー | 技術 |
+|----------|------|
+| ランタイム | Cloudflare Workers (Edge) |
+| フレームワーク | Hono v4 |
+| データベース | Cloudflare D1 (SQLite) |
+| 地図 | Leaflet 1.9 + OpenStreetMap |
+| CSS | Tailwind CSS (CDN) |
+| アイコン | Font Awesome 6 |
+| PWA | Service Worker + Web App Manifest |
+| ビルド | Vite + @hono/vite-build |
+
+## 機能一覧
+
+### 1. 記録機能 (Home Tab)
+- Geolocation `watchPosition` によるリアルタイムGPS記録
+- **5秒間隔 / 10m移動** のインテリジェントフィルタ
+- 一時停止 / 再開 / 終了の完全コントロール
+- 精度50m以上のノイズ自動フィルタ
+- 距離はHaversine公式でリアルタイム計算
+
+### 2. 記録結果 (Save Modal)
+- ルートをLeaflet地図上にプレビュー表示
+- ルート名 + 一言メモの保存
+- 保存時に自動でマイルストーン判定
+- 到達時はパラレル比較のオーバーレイ演出
+
+### 3. マイマップ (Map Tab)
+- 全ルートを累積表示する「育つ地図」
+- **通過頻度で線の太さ・濃さが変化**（点→線→面）
+- フィルタ: 今週 / 今月 / 今年 / 全期間
+- ~100mグリッドでのセグメント頻度集計
+
+### 4. パラレル比較 (Compare Tab)
+- **やった自分 vs やらなかった自分** の対比表示
+- 累計距離 10km / 50km / 100km / 300km / 1000km の自動マイルストーン
+- 到達時にフルスクリーンオーバーレイ演出
+  - 「この差は、もう埋まらない。」
+  - 「あなたは"前に進んだ"。」
+- 次のマイルストーンまでのプログレスバー
+- 到達履歴の一覧表示
+
+### 5. ふりかえり (Review Tab)
+- 週次 / 月次サマリー（距離・時間・回数）
+- 日別距離のバーチャート
+- 時間帯分布（24時間ヒストグラム）
+- よく歩く時間帯のハイライト
+
+### 6. PWA対応
+- `manifest.json` でホーム画面追加対応
+- Service Worker でオフラインキャッシュ
+- `apple-mobile-web-app-capable` メタタグ
+
+## データモデル
+
+### user_stats
 ```sql
-- id: アクティビティID
-- user_id: ユーザーID
-- activity_type: タイプ（walk/run/cycle）
-- distance: 距離（km）
-- duration: 時間（秒）
-- start_time: 開始時刻
-- end_time: 終了時刻
-- created_at: 記録日時
+total_distance_m    REAL     -- 累計距離 (m)
+total_duration_sec  INTEGER  -- 累計時間 (秒)
+total_activities    INTEGER  -- 累計記録数
+activity_days       INTEGER  -- 活動日数
+first_activity_at   TEXT     -- 初回記録日時
+last_activity_at    TEXT     -- 最終記録日時
 ```
 
-#### 3. **location_points** - GPS軌跡
+### activities
 ```sql
-- id: ポイントID
-- activity_id: アクティビティID
-- latitude: 緯度
-- longitude: 経度
-- accuracy: 精度（m）
-- timestamp: 記録時刻
+started_at     TEXT     -- 開始日時 ISO8601
+ended_at       TEXT     -- 終了日時
+distance_m     REAL     -- 距離 (m)
+duration_sec   INTEGER  -- 時間 (秒)
+polyline       TEXT     -- JSON [[lat,lng,elapsedSec],...]
+memo           TEXT     -- 一言メモ
+route_name     TEXT     -- ルート名
+avg_speed      REAL     -- 平均速度 m/s
+max_speed      REAL     -- 最高速度 m/s
 ```
 
-#### 4. **milestones** - マイルストーン
+### milestones
 ```sql
-- id: マイルストーンID
-- user_id: ユーザーID
-- milestone_type: タイプ（total_distance/activity_count）
-- milestone_value: 達成値
-- achieved_at: 達成日時
-- title: タイトル
-- description: 説明
+type              TEXT     -- 'distance_10km' 等
+threshold_m       REAL     -- 基準値 (m)
+reached_at        TEXT     -- 到達日時
+total_distance_m  REAL     -- 到達時の累計距離
+total_duration_sec INTEGER -- 到達時の累計時間
+total_activities  INTEGER  -- 到達時の累計回数
 ```
 
-#### 5. **frequent_places** - 頻出スポット（将来拡張用）
-```sql
-- place_name: 場所名
-- latitude/longitude: 座標
-- visit_count: 訪問回数
-- first_visit/last_visit: 初回/最終訪問日時
+## API仕様
+
+| Method | Path | 説明 |
+|--------|------|------|
+| GET | `/api/stats` | ユーザー統計 |
+| GET | `/api/activities?period=&limit=` | 一覧（period: week/month/year/all） |
+| GET | `/api/activities/:id` | 詳細 |
+| POST | `/api/activities` | 記録保存 + マイルストーン判定 |
+| PATCH | `/api/activities/:id` | メモ/ルート名更新 |
+| GET | `/api/milestones` | マイルストーン一覧 |
+| GET | `/api/review?period=` | ふりかえり集計 |
+| GET | `/api/heatmap?period=` | マイマップ用ルートデータ |
+
+## 画面構成 (IA)
+
+```
+┌─────────────────────────────┐
+│                             │
+│      Page Content           │
+│                             │
+├─────────────────────────────┤
+│  記録  │ 地図 │ 振返│ 比較  │  ← 下部タブバー
+└─────────────────────────────┘
 ```
 
-### ストレージサービス
-- **Cloudflare D1**: SQLiteベースの永続データベース
-- **ローカル開発**: `.wrangler/state/v3/d1` にローカルSQLite自動生成
+## ローカル開発
 
----
-
-## 🎯 API仕様
-
-### GET `/api/stats`
-統計情報取得（ユーザー統計、最近のアクティビティ、週間統計、マイルストーン）
-
-### GET `/api/activities`
-アクティビティ一覧取得（ページネーション対応）
-
-### GET `/api/activities/:id`
-アクティビティ詳細取得（GPS軌跡含む）
-
-### POST `/api/activities`
-アクティビティ記録保存（位置情報配列、距離、時間等）
-
-### GET `/api/milestones`
-マイルストーン一覧取得
-
----
-
-## 📖 使い方
-
-### 1. トラッキング開始
-1. 「トラッキング開始」ボタンをクリック
-2. アクティビティタイプを選択（ウォーキング/ランニング/サイクリング）
-3. ブラウザの位置情報許可を承認
-4. リアルタイムで距離・時間が記録される
-
-### 2. トラッキング停止
-1. 「トラッキング停止」ボタンをクリック
-2. 自動的にデータベースに保存される
-3. マイルストーン達成時は祝福メッセージが表示される
-
-### 3. 履歴確認
-- ダッシュボードで累計統計を確認
-- 週間グラフで活動パターンを可視化
-- 最近のアクティビティ一覧で過去の記録を振り返る
-- マイルストーン一覧で達成記録を確認
-
----
-
-## 🛠️ 技術スタック
-
-### フロントエンド
-- **HTML/CSS/JavaScript** - バニラJSによるシンプル実装
-- **TailwindCSS** - ユーティリティファーストCSSフレームワーク
-- **Chart.js** - データ可視化ライブラリ
-- **Axios** - HTTPクライアント
-- **Day.js** - 日時処理ライブラリ
-- **Font Awesome** - アイコンフォント
-
-### バックエンド
-- **Hono** - 軽量Webフレームワーク
-- **TypeScript** - 型安全な開発
-- **Cloudflare Workers** - エッジランタイム
-- **Cloudflare D1** - SQLiteベース分散データベース
-
-### 開発ツール
-- **Vite** - ビルドツール
-- **Wrangler** - Cloudflare CLI
-- **PM2** - プロセスマネージャー（開発環境）
-
----
-
-## 🚀 デプロイ方法
-
-### ローカル開発
 ```bash
-# 依存関係インストール
 npm install
-
-# データベースマイグレーション
-npm run db:migrate:local
-
-# サンプルデータ投入
-npm run db:seed
-
-# ビルド
-npm run build
-
-# PM2で開発サーバー起動
-pm2 start ecosystem.config.cjs
-
-# 動作確認
-curl http://localhost:3000
+npm run db:migrate:local   # D1マイグレーション
+npm run db:seed            # サンプルデータ投入
+npm run build              # Viteビルド
+pm2 start ecosystem.config.cjs  # 開発サーバー
+# → http://localhost:3000
 ```
 
-### Cloudflare Pagesへのデプロイ
-```bash
-# D1データベース作成（初回のみ）
-npx wrangler d1 create webapp-production
-
-# wrangler.jsonc のdatabase_idを更新
-
-# 本番マイグレーション実行
-npm run db:migrate:prod
-
-# デプロイ
-npm run deploy:prod
-```
-
----
-
-## 📂 プロジェクト構成
+## ディレクトリ構成
 
 ```
 webapp/
 ├── src/
-│   ├── index.tsx          # メインアプリケーション（API + フロントエンド）
-│   └── renderer.tsx       # HTMLレンダラー
+│   ├── index.tsx          # Hono app エントリ + SPA shell
+│   ├── api.ts             # 全APIルート
+│   └── renderer.tsx       # HTML shell (PWA meta tags)
 ├── public/static/
-│   ├── app.js             # フロントエンドロジック（位置情報トラッキング）
-│   └── style.css          # カスタムCSS
+│   ├── app.js             # SPA controller (28KB)
+│   ├── style.css          # PWA-first CSS
+│   ├── sw.js              # Service Worker
+│   ├── manifest.json      # PWA manifest
+│   ├── icon.svg           # App icon
+│   └── icon-{192,512}.png # PWA icons
 ├── migrations/
-│   └── 0001_initial_schema.sql  # データベーススキーマ
+│   └── 0001_initial_schema.sql
 ├── seed.sql               # サンプルデータ
 ├── ecosystem.config.cjs   # PM2設定
 ├── wrangler.jsonc         # Cloudflare設定
-├── package.json           # 依存関係とスクリプト
-└── README.md              # このファイル
+├── vite.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
----
+## 設計思想
 
-## 🔮 今後の拡張案
+### 自己効力感設計の3原則
 
-### 未実装機能
-- 📍 **地図表示**: GPS軌跡のマップ可視化（Leaflet.js / Mapbox）
-- 🏃 **リアルタイムペース計算**: 現在のペース表示
-- 📈 **詳細統計**: 月次・年次レポート、ヒートマップ
-- 🎖️ **バッジシステム**: 特別な条件達成時のバッジ授与
-- 📸 **写真記録**: アクティビティに写真を添付
-- 🌤️ **天気情報統合**: 記録時の天候データ保存
-- 👥 **ソーシャル機能**: 友人との記録共有
-- 🔔 **リマインダー**: 定期的な運動促進通知
-- 🎵 **音声フィードバック**: トラッキング中の音声ガイド
-- 🏆 **チャレンジモード**: 週次・月次チャレンジ設定
+1. **不可逆性**: 一度記録したデータは消えない。地図は育つ一方。時間が価値を生む。
+2. **自己比較のみ**: 他人ランキングなし。「やった自分 vs やらなかった自分」だけ。
+3. **情緒的演出**: マイルストーン到達時の対比表示で「止まらなかった事実」を祝う。
 
-### 推奨される次のステップ
-1. **地図表示機能の追加** - GPS軌跡の可視化で体験価値向上
-2. **エクスポート機能** - GPXファイル出力でデータポータビリティ
-3. **PWA化** - オフライン対応とアプリインストール
-4. **ダークモード** - UI/UX改善
-5. **多言語対応** - 国際化対応
+### 地図が育つ仕組み
 
----
+- 1回目: 薄い細い線 → 同じ道を歩くたび **太く・濃く** なる
+- セグメント頻度を ~100m グリッドで集計
+- 通過1回=opacity 0.45, 2-3回=0.7, 4回+=1.0 & weight増加
+- 「点→線→面」の視覚変化で蓄積を体感
 
-## 📊 デプロイ状況
+## デプロイ状況
 
 - **プラットフォーム**: Cloudflare Pages
-- **ステータス**: ✅ ローカル開発環境で動作中
+- **ステータス**: 開発環境で動作中
 - **最終更新**: 2026-02-15
-
----
-
-## 🎉 まとめ
-
-Journey Trackerは、単なる記録アプリではなく、**時間とともに深まる情緒的資産**を構築するアプリケーションです。
-
-- ✅ 使えば使うほど蓄積されるデータ
-- ✅ 時間経過とともに深まる文脈
-- ✅ 自分だけの履歴という不可逆的な価値
-- ✅ マイルストーンによる達成感と継続モチベーション
-
-**あなたの歩みを記録し、時間とともに育てていきましょう！** 🚶‍♂️✨
