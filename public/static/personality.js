@@ -492,7 +492,8 @@ const MBTI_ANIMALS = {
 };
 
 /**
- * MBTI + Big Five から動物SVGアバターを生成
+ * MBTI + Big Five から高品質チビキャラ動物SVGアバターを生成
+ * MindAxis風：リッチグラデーション、大きなキラキラ目、ファンタジー要素
  * @param {string} mbti - MBTIコード (例: "INFP")
  * @param {object} bigFive - { E, A, C, N, O } (各1-7)
  * @param {number} size - SVGサイズ (default 200)
@@ -503,11 +504,11 @@ function generateAvatar(mbti, bigFive, size = 200) {
   const animalInfo = MBTI_ANIMALS[mbti] || MBTI_ANIMALS['INFP'];
   const b5 = bigFive || { E: 4, A: 4, C: 4, N: 4, O: 4 };
 
-  const E = (b5.E - 1) / 6;
-  const A = (b5.A - 1) / 6;
-  const C = (b5.C - 1) / 6;
-  const N = (b5.N - 1) / 6;
-  const O = (b5.O - 1) / 6;
+  const E = (b5.E - 1) / 6; // 外向性
+  const A = (b5.A - 1) / 6; // 協調性
+  const C = (b5.C - 1) / 6; // 誠実性
+  const N = (b5.N - 1) / 6; // 神経症的傾向
+  const O = (b5.O - 1) / 6; // 開放性
 
   const c1 = prof.gradientFrom;
   const c2 = prof.gradientTo;
@@ -515,267 +516,479 @@ function generateAvatar(mbti, bigFive, size = 200) {
   const lerp = (a, b, t) => a + (b - a) * t;
   const cx = size / 2;
   const cy = size / 2;
-  const u = size / 200; // unit scale
+  const u = size / 200;
 
   // deterministic rng
   let seed = 0;
   for (let i = 0; i < mbti.length; i++) seed = seed * 31 + mbti.charCodeAt(i);
   const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
 
-  // uid for gradient IDs (prevent conflict when multiple SVGs)
-  const uid = mbti + size;
+  // hex helpers
+  const hexToRgb = (h) => {
+    const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+    return {r,g,b};
+  };
+  const lerpColor = (h1, h2, t) => {
+    const a = hexToRgb(h1), b2 = hexToRgb(h2);
+    const r = Math.round(a.r+(b2.r-a.r)*t), g = Math.round(a.g+(b2.g-a.g)*t), bl = Math.round(a.b+(b2.b-a.b)*t);
+    return `rgb(${r},${g},${bl})`;
+  };
+  const lighten = (hex, amt) => {
+    const {r,g,b: bl} = hexToRgb(hex);
+    return `rgb(${Math.min(255,r+amt)},${Math.min(255,g+amt)},${Math.min(255,bl+amt)})`;
+  };
+  const darken = (hex, amt) => lighten(hex, -amt);
 
+  const uid = 'a' + mbti + size + Math.random().toString(36).slice(2,6);
+  const a = animalInfo.animal;
+
+  // ═══ 動物カラーパレット（タイプ固有の自然色） ═══
+  const PALETTES = {
+    owl:       { body: '#6c5ce7', bodyL: '#a29bfe', belly: '#ddd6fe', markA: '#4c3ec4', markB: '#c4b5fd', glow: '#8b5cf6' },
+    cat:       { body: '#7c3aed', bodyL: '#c4b5fd', belly: '#ede9fe', markA: '#5b21b6', markB: '#ddd6fe', glow: '#a78bfa' },
+    lion:      { body: '#dc2626', bodyL: '#fca5a5', belly: '#fee2e2', markA: '#991b1b', markB: '#fecaca', glow: '#f87171' },
+    fox:       { body: '#ea580c', bodyL: '#fdba74', belly: '#fff7ed', markA: '#c2410c', markB: '#fed7aa', glow: '#fb923c' },
+    wolf:      { body: '#0284c7', bodyL: '#7dd3fc', belly: '#e0f2fe', markA: '#075985', markB: '#bae6fd', glow: '#38bdf8' },
+    deer:      { body: '#db2777', bodyL: '#f9a8d4', belly: '#fce7f3', markA: '#9d174d', markB: '#fbcfe8', glow: '#f472b6' },
+    dolphin:   { body: '#0891b2', bodyL: '#67e8f9', belly: '#e0f7fa', markA: '#155e75', markB: '#a5f3fc', glow: '#22d3ee' },
+    butterfly: { body: '#9333ea', bodyL: '#d8b4fe', belly: '#f5f3ff', markA: '#6b21a8', markB: '#e9d5ff', glow: '#c084fc' },
+    bear:      { body: '#4b5563', bodyL: '#9ca3af', belly: '#e5e7eb', markA: '#374151', markB: '#d1d5db', glow: '#6b7280' },
+    rabbit:    { body: '#0d9488', bodyL: '#5eead4', belly: '#ccfbf1', markA: '#115e59', markB: '#99f6e4', glow: '#2dd4bf' },
+    eagle:     { body: '#1d4ed8', bodyL: '#93c5fd', belly: '#dbeafe', markA: '#1e3a8a', markB: '#bfdbfe', glow: '#60a5fa' },
+    dog:       { body: '#059669', bodyL: '#6ee7b7', belly: '#d1fae5', markA: '#065f46', markB: '#a7f3d0', glow: '#34d399' },
+    hawk:      { body: '#78716c', bodyL: '#d6d3d1', belly: '#f5f5f4', markA: '#44403c', markB: '#e7e5e4', glow: '#a8a29e' },
+    panda:     { body: '#e11d48', bodyL: '#fda4af', belly: '#fff1f2', markA: '#9f1239', markB: '#fecdd3', glow: '#fb7185' },
+    tiger:     { body: '#ea580c', bodyL: '#fdba74', belly: '#fff7ed', markA: '#9a3412', markB: '#fed7aa', glow: '#f97316' },
+    otter:     { body: '#d946ef', bodyL: '#f0abfc', belly: '#fdf4ff', markA: '#a21caf', markB: '#f5d0fe', glow: '#e879f9' },
+  };
+  const pal = PALETTES[a] || PALETTES.cat;
+
+  // ═══ SVG開始 + デフィニション ═══
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">`;
   svg += `<defs>`;
-  svg += `<radialGradient id="bg-${uid}" cx="50%" cy="40%"><stop offset="0%" stop-color="${c2}" stop-opacity="0.18"/><stop offset="100%" stop-color="${c1}" stop-opacity="0.06"/></radialGradient>`;
-  svg += `<linearGradient id="fur-${uid}" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0%" stop-color="${c2}"/><stop offset="100%" stop-color="${c1}"/></linearGradient>`;
-  svg += `<radialGradient id="belly-${uid}" cx="50%" cy="45%"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#fff" stop-opacity="0.3"/></radialGradient>`;
+  // 背景グラデーション
+  svg += `<radialGradient id="${uid}-bg" cx="50%" cy="45%"><stop offset="0%" stop-color="${pal.glow}" stop-opacity="0.25"/><stop offset="60%" stop-color="${pal.glow}" stop-opacity="0.08"/><stop offset="100%" stop-color="${pal.body}" stop-opacity="0.02"/></radialGradient>`;
+  // 体メイングラデーション（上から光）
+  svg += `<radialGradient id="${uid}-fur" cx="50%" cy="25%" r="70%"><stop offset="0%" stop-color="${pal.bodyL}"/><stop offset="70%" stop-color="${pal.body}"/><stop offset="100%" stop-color="${pal.markA}"/></radialGradient>`;
+  // 体ハイライト
+  svg += `<radialGradient id="${uid}-hi" cx="40%" cy="20%" r="60%"><stop offset="0%" stop-color="#fff" stop-opacity="0.55"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient>`;
+  // お腹グラデーション
+  svg += `<radialGradient id="${uid}-belly" cx="50%" cy="35%"><stop offset="0%" stop-color="${pal.belly}"/><stop offset="100%" stop-color="${pal.bodyL}" stop-opacity="0.5"/></radialGradient>`;
+  // 目グラデーション
+  svg += `<radialGradient id="${uid}-iris" cx="45%" cy="35%"><stop offset="0%" stop-color="${pal.bodyL}"/><stop offset="50%" stop-color="${pal.body}"/><stop offset="100%" stop-color="${pal.markA}"/></radialGradient>`;
+  // グロー
+  svg += `<radialGradient id="${uid}-glow" cx="50%" cy="50%"><stop offset="0%" stop-color="${pal.glow}" stop-opacity="0.4"/><stop offset="100%" stop-color="${pal.glow}" stop-opacity="0"/></radialGradient>`;
+  // フィルター - ソフトグロー
+  svg += `<filter id="${uid}-sf" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="${2*u}"/></filter>`;
   svg += `</defs>`;
 
-  // background
-  svg += `<circle cx="${cx}" cy="${cy}" r="${size * 0.48}" fill="url(#bg-${uid})"/>`;
+  // ═══ 背景グロー ═══
+  svg += `<circle cx="${cx}" cy="${cy}" r="${size*0.48}" fill="url(#${uid}-bg)"/>`;
+  // 外周のソフトグロー
+  svg += `<circle cx="${cx}" cy="${cy+2*u}" r="${size*0.38}" fill="url(#${uid}-glow)" filter="url(#${uid}-sf)"/>`;
 
-  // Big-Five driven params
-  const bodyW = lerp(0.28, 0.36, (E + A) / 2) * size;
-  const eyeSize = lerp(5, 10, E) * u;
-  const smileW = lerp(4, 14, E) * u;
-  const smileD = lerp(1, 6, (E + A) / 2) * u;
-  const blush = lerp(0, 0.45, (N + A) / 2);
-  const sparkle = N > 0.5;
+  // ═══ Big-Five パラメータ ═══
+  const bodyScale = lerp(0.85, 1.1, (E + A) / 2);
+  const eyeScale = lerp(0.85, 1.2, (E + O) / 2);
+  const blushAlpha = lerp(0, 0.6, (N + A) / 2);
+  const sparkleCount = Math.floor(lerp(0, 5, O));
+  const smileIntensity = lerp(0.2, 1.0, E);
+  const cheekPuff = lerp(0, 1, A);
 
-  // particles (O = 開放性)
-  const nPart = Math.floor(lerp(0, 7, O));
-  if (nPart > 0) {
-    for (let i = 0; i < nPart; i++) {
-      const ang = (i / nPart) * Math.PI * 2 + rng() * 0.6;
-      const dist = size * lerp(0.38, 0.47, rng());
+  // 基準サイズ
+  const bodyW = 38 * u * bodyScale;
+  const bodyH = 35 * u * bodyScale;
+  const headR = 32 * u * lerp(0.95, 1.08, (E+O)/2);
+  const headY = cy - 10 * u;
+  const bodyY = cy + 25 * u;
+
+  // ═══ マジカルパーティクル (O:開放性) ═══
+  if (sparkleCount > 0) {
+    for (let i = 0; i < sparkleCount + 3; i++) {
+      const ang = (i / (sparkleCount + 3)) * Math.PI * 2 + rng() * 1.2;
+      const dist = size * lerp(0.32, 0.47, rng());
       const px = cx + Math.cos(ang) * dist;
       const py = cy + Math.sin(ang) * dist;
-      const pr = lerp(1.5, 4.5, rng()) * u;
-      const po = lerp(0.12, 0.4, rng());
-      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${pr.toFixed(1)}" fill="${accent}" opacity="${po.toFixed(2)}"><animate attributeName="opacity" values="${po.toFixed(2)};${(po * 0.25).toFixed(2)};${po.toFixed(2)}" dur="${lerp(2, 4, rng()).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+      const ps = lerp(1.5, 4, rng()) * u;
+      const po = lerp(0.15, 0.5, rng());
+      const dur = lerp(2, 5, rng());
+      // 星型パーティクル
+      if (rng() > 0.5) {
+        const s = ps * 1.2;
+        svg += `<path d="M${px},${py-s} L${px+s*0.3},${py-s*0.3} L${px+s},${py} L${px+s*0.3},${py+s*0.3} L${px},${py+s} L${px-s*0.3},${py+s*0.3} L${px-s},${py} L${px-s*0.3},${py-s*0.3} Z" fill="${pal.glow}" opacity="${po.toFixed(2)}"><animate attributeName="opacity" values="${po.toFixed(2)};${(po*0.2).toFixed(2)};${po.toFixed(2)}" dur="${dur.toFixed(1)}s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="rotate" values="0 ${px.toFixed(1)} ${py.toFixed(1)};360 ${px.toFixed(1)} ${py.toFixed(1)}" dur="${(dur*3).toFixed(1)}s" repeatCount="indefinite"/></path>`;
+      } else {
+        svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${ps.toFixed(1)}" fill="${pal.bodyL}" opacity="${po.toFixed(2)}"><animate attributeName="opacity" values="${po.toFixed(2)};${(po*0.15).toFixed(2)};${po.toFixed(2)}" dur="${dur.toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+      }
     }
   }
 
-  // ─── 動物ごとの描画 ───
-  const a = animalInfo.animal;
-  const fy = cy + 4 * u; // face center y (slightly lower)
+  // ═══════════════ 動物別描画 ═══════════════
 
-  // 共通: 体 (丸い胴体)
-  svg += `<ellipse cx="${cx}" cy="${fy + 30 * u}" rx="${bodyW}" ry="${28 * u}" fill="url(#fur-${uid})"/>`;
-  svg += `<ellipse cx="${cx}" cy="${fy + 32 * u}" rx="${bodyW * 0.65}" ry="${18 * u}" fill="url(#belly-${uid})"/>`;
-
-  // 共通: 顔
-  const faceR = lerp(26, 32, (E + O) / 2) * u;
-  svg += `<circle cx="${cx}" cy="${fy}" r="${faceR}" fill="url(#fur-${uid})"/>`;
-  // 顔のハイライト
-  svg += `<ellipse cx="${cx}" cy="${fy + faceR * 0.08}" rx="${faceR * 0.7}" ry="${faceR * 0.55}" fill="#fff" opacity="0.12"/>`;
-
-  // ─── 耳 (動物種別) ───
-  if (a === 'cat' || a === 'fox') {
-    // 三角耳
-    const earW = 14 * u, earH = 20 * u;
-    const tilt = a === 'fox' ? 4 * u : 2 * u;
-    svg += `<path d="M${cx - faceR * 0.65},${fy - faceR * 0.55} L${cx - faceR * 0.35 - tilt},${fy - faceR - earH} L${cx - faceR * 0.05},${fy - faceR * 0.45} Z" fill="url(#fur-${uid})"/>`;
-    svg += `<path d="M${cx + faceR * 0.05},${fy - faceR * 0.45} L${cx + faceR * 0.35 + tilt},${fy - faceR - earH} L${cx + faceR * 0.65},${fy - faceR * 0.55} Z" fill="url(#fur-${uid})"/>`;
-    // inner ear
-    svg += `<path d="M${cx - faceR * 0.55},${fy - faceR * 0.55} L${cx - faceR * 0.35 - tilt * 0.5},${fy - faceR - earH * 0.7} L${cx - faceR * 0.15},${fy - faceR * 0.5} Z" fill="#f9a8d4" opacity="0.5"/>`;
-    svg += `<path d="M${cx + faceR * 0.15},${fy - faceR * 0.5} L${cx + faceR * 0.35 + tilt * 0.5},${fy - faceR - earH * 0.7} L${cx + faceR * 0.55},${fy - faceR * 0.55} Z" fill="#f9a8d4" opacity="0.5"/>`;
+  // --- 尻尾（体の後ろに描画） ---
+  if (a === 'cat' || a === 'fox' || a === 'wolf' || a === 'dog' || a === 'tiger' || a === 'otter') {
+    const tx = cx + bodyW * 0.75;
+    const ty = bodyY + 5 * u;
+    const curl = a === 'fox' ? 28 * u : 18 * u;
+    svg += `<path d="M${tx},${ty} Q${tx+curl*0.6},${ty-curl*0.9} ${tx+curl},${ty-curl*0.5} Q${tx+curl*1.2},${ty-curl*0.1} ${tx+curl*0.8},${ty}" fill="none" stroke="url(#${uid}-fur)" stroke-width="${7*u}" stroke-linecap="round" opacity="0.8"/>`;
+    if (a === 'fox') {
+      svg += `<circle cx="${tx+curl}" cy="${ty-curl*0.5}" r="${4*u}" fill="#fff" opacity="0.5"/>`;
+    }
   } else if (a === 'rabbit') {
-    // 長い耳
-    const earH = 32 * u;
-    svg += `<ellipse cx="${cx - faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${6 * u}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(-10,${cx - faceR * 0.35},${fy - faceR})"/>`;
-    svg += `<ellipse cx="${cx + faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${6 * u}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(10,${cx + faceR * 0.35},${fy - faceR})"/>`;
-    svg += `<ellipse cx="${cx - faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${3.5 * u}" ry="${earH * 0.75}" fill="#f9a8d4" opacity="0.45" transform="rotate(-10,${cx - faceR * 0.35},${fy - faceR})"/>`;
-    svg += `<ellipse cx="${cx + faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${3.5 * u}" ry="${earH * 0.75}" fill="#f9a8d4" opacity="0.45" transform="rotate(10,${cx + faceR * 0.35},${fy - faceR})"/>`;
-  } else if (a === 'bear' || a === 'panda') {
-    // 丸耳
-    const er = 10 * u;
-    svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
-    svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
-    if (a === 'panda') {
-      svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.6}" fill="${c1}" opacity="0.7"/>`;
-      svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.6}" fill="${c1}" opacity="0.7"/>`;
-    } else {
-      svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.55}" fill="${c2}" opacity="0.4"/>`;
-      svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.55}" fill="${c2}" opacity="0.4"/>`;
-    }
-  } else if (a === 'owl') {
-    // 耳飾り羽
-    const earH = 16 * u;
-    svg += `<path d="M${cx - faceR * 0.6},${fy - faceR * 0.6} L${cx - faceR * 0.55},${fy - faceR - earH} L${cx - faceR * 0.2},${fy - faceR * 0.7} Z" fill="url(#fur-${uid})"/>`;
-    svg += `<path d="M${cx + faceR * 0.2},${fy - faceR * 0.7} L${cx + faceR * 0.55},${fy - faceR - earH} L${cx + faceR * 0.6},${fy - faceR * 0.6} Z" fill="url(#fur-${uid})"/>`;
-  } else if (a === 'dog') {
-    // 垂れ耳
-    const earW = 10 * u, earH = 20 * u;
-    svg += `<ellipse cx="${cx - faceR * 0.75}" cy="${fy - faceR * 0.1}" rx="${earW}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(20,${cx - faceR * 0.75},${fy - faceR * 0.1})"/>`;
-    svg += `<ellipse cx="${cx + faceR * 0.75}" cy="${fy - faceR * 0.1}" rx="${earW}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(-20,${cx + faceR * 0.75},${fy - faceR * 0.1})"/>`;
-  } else if (a === 'wolf') {
-    // 尖った耳
-    const earH = 22 * u;
-    svg += `<path d="M${cx - faceR * 0.6},${fy - faceR * 0.5} L${cx - faceR * 0.45},${fy - faceR - earH} L${cx - faceR * 0.1},${fy - faceR * 0.6} Z" fill="url(#fur-${uid})"/>`;
-    svg += `<path d="M${cx + faceR * 0.1},${fy - faceR * 0.6} L${cx + faceR * 0.45},${fy - faceR - earH} L${cx + faceR * 0.6},${fy - faceR * 0.5} Z" fill="url(#fur-${uid})"/>`;
-    svg += `<path d="M${cx - faceR * 0.5},${fy - faceR * 0.5} L${cx - faceR * 0.45},${fy - faceR - earH * 0.6} L${cx - faceR * 0.2},${fy - faceR * 0.55} Z" fill="${c2}" opacity="0.35"/>`;
-    svg += `<path d="M${cx + faceR * 0.2},${fy - faceR * 0.55} L${cx + faceR * 0.45},${fy - faceR - earH * 0.6} L${cx + faceR * 0.5},${fy - faceR * 0.5} Z" fill="${c2}" opacity="0.35"/>`;
+    svg += `<circle cx="${cx+bodyW*0.6}" cy="${bodyY+10*u}" r="${5*u}" fill="#fff" opacity="0.7"/>`;
+    svg += `<circle cx="${cx+bodyW*0.6}" cy="${bodyY+10*u}" r="${3*u}" fill="${pal.belly}" opacity="0.5"/>`;
   } else if (a === 'lion') {
-    // たてがみ
-    const maneR = faceR * 1.35;
-    for (let i = 0; i < 12; i++) {
-      const ang = (i / 12) * Math.PI * 2;
-      const mr = maneR + rng() * 6 * u;
-      const px = cx + Math.cos(ang) * mr;
-      const py = fy + Math.sin(ang) * mr;
-      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${lerp(6, 10, rng()) * u}" fill="${c1}" opacity="${lerp(0.25, 0.5, rng()).toFixed(2)}"/>`;
+    const tx = cx + bodyW * 0.7;
+    const ty = bodyY;
+    svg += `<path d="M${tx},${ty} Q${tx+20*u},${ty-15*u} ${tx+25*u},${ty-5*u}" fill="none" stroke="url(#${uid}-fur)" stroke-width="${5*u}" stroke-linecap="round" opacity="0.7"/>`;
+    svg += `<circle cx="${tx+26*u}" cy="${ty-4*u}" r="${5*u}" fill="${pal.markA}" opacity="0.4"/>`;
+  }
+
+  // --- チョウの翼（体の後ろ） ---
+  if (a === 'butterfly') {
+    const wsx = bodyW * 1.1;
+    const wy = bodyY - 10 * u;
+    // 上翼
+    svg += `<ellipse cx="${cx-wsx-8*u}" cy="${wy-12*u}" rx="${22*u}" ry="${20*u}" fill="${pal.bodyL}" opacity="0.55" transform="rotate(-20,${cx-wsx},${wy})"/>`;
+    svg += `<ellipse cx="${cx+wsx+8*u}" cy="${wy-12*u}" rx="${22*u}" ry="${20*u}" fill="${pal.bodyL}" opacity="0.55" transform="rotate(20,${cx+wsx},${wy})"/>`;
+    // 下翼
+    svg += `<ellipse cx="${cx-wsx-4*u}" cy="${wy+10*u}" rx="${16*u}" ry="${14*u}" fill="${pal.body}" opacity="0.4" transform="rotate(-10,${cx-wsx},${wy})"/>`;
+    svg += `<ellipse cx="${cx+wsx+4*u}" cy="${wy+10*u}" rx="${16*u}" ry="${14*u}" fill="${pal.body}" opacity="0.4" transform="rotate(10,${cx+wsx},${wy})"/>`;
+    // 翼の模様
+    svg += `<circle cx="${cx-wsx-8*u}" cy="${wy-12*u}" r="${8*u}" fill="${pal.glow}" opacity="0.3"/>`;
+    svg += `<circle cx="${cx+wsx+8*u}" cy="${wy-12*u}" r="${8*u}" fill="${pal.glow}" opacity="0.3"/>`;
+    svg += `<circle cx="${cx-wsx-8*u}" cy="${wy-12*u}" r="${4*u}" fill="#fff" opacity="0.25"/>`;
+    svg += `<circle cx="${cx+wsx+8*u}" cy="${wy-12*u}" r="${4*u}" fill="#fff" opacity="0.25"/>`;
+  }
+
+  // --- 体（丸い胴体） ---
+  svg += `<ellipse cx="${cx}" cy="${bodyY}" rx="${bodyW}" ry="${bodyH}" fill="url(#${uid}-fur)"/>`;
+  svg += `<ellipse cx="${cx}" cy="${bodyY}" rx="${bodyW}" ry="${bodyH}" fill="url(#${uid}-hi)"/>`;
+  // お腹
+  svg += `<ellipse cx="${cx}" cy="${bodyY+4*u}" rx="${bodyW*0.6}" ry="${bodyH*0.65}" fill="url(#${uid}-belly)"/>`;
+
+  // --- イルカのヒレ ---
+  if (a === 'dolphin') {
+    svg += `<path d="M${cx+bodyW*0.4},${bodyY-bodyH*0.5} Q${cx+bodyW*0.8},${bodyY-bodyH*1.1} ${cx+bodyW*0.9},${bodyY-bodyH*0.3}" fill="url(#${uid}-fur)" opacity="0.7"/>`;
+    // 尾ビレ
+    svg += `<path d="M${cx+bodyW*0.5},${bodyY+bodyH*0.6} Q${cx+bodyW*1.1},${bodyY+bodyH*0.2} ${cx+bodyW*1.2},${bodyY+bodyH*0.8}" fill="url(#${uid}-fur)" opacity="0.6"/>`;
+  }
+
+  // --- 腕/前足 ---
+  const armY = bodyY - 2 * u;
+  if (a !== 'butterfly' && a !== 'dolphin') {
+    // 左腕
+    svg += `<ellipse cx="${cx-bodyW*0.7}" cy="${armY+10*u}" rx="${8*u}" ry="${14*u}" fill="url(#${uid}-fur)" transform="rotate(15,${cx-bodyW*0.7},${armY+10*u})"/>`;
+    svg += `<ellipse cx="${cx-bodyW*0.7}" cy="${armY+10*u}" rx="${8*u}" ry="${14*u}" fill="url(#${uid}-hi)" transform="rotate(15,${cx-bodyW*0.7},${armY+10*u})"/>`;
+    // 右腕
+    svg += `<ellipse cx="${cx+bodyW*0.7}" cy="${armY+10*u}" rx="${8*u}" ry="${14*u}" fill="url(#${uid}-fur)" transform="rotate(-15,${cx+bodyW*0.7},${armY+10*u})"/>`;
+  }
+
+  // --- 足 ---
+  if (a !== 'dolphin' && a !== 'butterfly') {
+    const footY = bodyY + bodyH - 4*u;
+    const fsp = bodyW * 0.45;
+    svg += `<ellipse cx="${cx-fsp}" cy="${footY}" rx="${9*u}" ry="${6*u}" fill="${pal.markA}" opacity="0.45"/>`;
+    svg += `<ellipse cx="${cx+fsp}" cy="${footY}" rx="${9*u}" ry="${6*u}" fill="${pal.markA}" opacity="0.45"/>`;
+    svg += `<ellipse cx="${cx-fsp}" cy="${footY}" rx="${6*u}" ry="${4*u}" fill="${pal.belly}" opacity="0.35"/>`;
+    svg += `<ellipse cx="${cx+fsp}" cy="${footY}" rx="${6*u}" ry="${4*u}" fill="${pal.belly}" opacity="0.35"/>`;
+  }
+
+  // ═══ ライオンのたてがみ（頭の後ろ） ═══
+  if (a === 'lion') {
+    const mr = headR * 1.45;
+    for (let i = 0; i < 16; i++) {
+      const ang = (i / 16) * Math.PI * 2;
+      const rr = mr + rng() * 10 * u;
+      const px = cx + Math.cos(ang) * rr;
+      const py = headY + Math.sin(ang) * rr;
+      const cr = lerp(8, 14, rng()) * u;
+      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${cr.toFixed(1)}" fill="${lerpColor(pal.markA, pal.body, rng())}" opacity="${lerp(0.35, 0.65, rng()).toFixed(2)}"/>`;
     }
+    // 内側のなめらかなたてがみ
+    svg += `<circle cx="${cx}" cy="${headY}" r="${headR*1.2}" fill="url(#${uid}-fur)" opacity="0.3"/>`;
+  }
+
+  // ═══ 頭（大きい丸） ═══
+  svg += `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="url(#${uid}-fur)"/>`;
+  svg += `<circle cx="${cx}" cy="${headY}" r="${headR}" fill="url(#${uid}-hi)"/>`;
+  // 頬のふっくら
+  if (cheekPuff > 0.3) {
+    const cp = cheekPuff * 0.12;
+    svg += `<ellipse cx="${cx-headR*0.55}" cy="${headY+headR*0.15}" rx="${headR*cp*1.8}" ry="${headR*cp*1.2}" fill="${pal.bodyL}" opacity="0.2"/>`;
+    svg += `<ellipse cx="${cx+headR*0.55}" cy="${headY+headR*0.15}" rx="${headR*cp*1.8}" ry="${headR*cp*1.2}" fill="${pal.bodyL}" opacity="0.2"/>`;
+  }
+
+  // ═══ 耳（動物種別） ═══
+  if (a === 'cat' || a === 'fox') {
+    const eh = 24 * u;
+    const ew = 16 * u;
+    const tilt = a === 'fox' ? 5 : 3;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.6;
+      const ey = headY - headR * 0.7;
+      svg += `<path d="M${ex-s*ew*0.5},${ey+eh*0.5} L${ex},${ey-eh*0.5} L${ex+s*ew*0.5},${ey+eh*0.5} Z" fill="url(#${uid}-fur)"/>`;
+      svg += `<path d="M${ex-s*ew*0.3},${ey+eh*0.35} L${ex},${ey-eh*0.25} L${ex+s*ew*0.3},${ey+eh*0.35} Z" fill="${pal.markB}" opacity="0.5"/>`;
+      svg += `<path d="M${ex-s*ew*0.15},${ey+eh*0.2} L${ex},${ey-eh*0.05} L${ex+s*ew*0.15},${ey+eh*0.2} Z" fill="#f9a8d4" opacity="0.35"/>`;
+    });
+  } else if (a === 'rabbit') {
+    const eh = 38 * u;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.3;
+      const ey = headY - headR;
+      const rot = s * 8;
+      svg += `<ellipse cx="${ex}" cy="${ey-eh*0.3}" rx="${8*u}" ry="${eh}" fill="url(#${uid}-fur)" transform="rotate(${rot},${ex},${ey})"/>`;
+      svg += `<ellipse cx="${ex}" cy="${ey-eh*0.3}" rx="${8*u}" ry="${eh}" fill="url(#${uid}-hi)" transform="rotate(${rot},${ex},${ey})"/>`;
+      svg += `<ellipse cx="${ex}" cy="${ey-eh*0.25}" rx="${4.5*u}" ry="${eh*0.7}" fill="#f9a8d4" opacity="0.4" transform="rotate(${rot},${ex},${ey})"/>`;
+    });
+  } else if (a === 'bear' || a === 'panda') {
+    const er = 12 * u;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.7;
+      const ey = headY - headR * 0.65;
+      svg += `<circle cx="${ex}" cy="${ey}" r="${er}" fill="url(#${uid}-fur)"/>`;
+      if (a === 'panda') {
+        svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.7}" fill="${pal.markA}" opacity="0.8"/>`;
+      } else {
+        svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.6}" fill="${pal.belly}" opacity="0.4"/>`;
+      }
+    });
+  } else if (a === 'owl') {
+    const eh = 20 * u;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.55;
+      const ey = headY - headR * 0.65;
+      svg += `<path d="M${ex-s*8*u},${ey+eh*0.4} L${ex+s*2*u},${ey-eh*0.6} L${ex+s*10*u},${ey+eh*0.3} Z" fill="url(#${uid}-fur)"/>`;
+      svg += `<path d="M${ex-s*5*u},${ey+eh*0.3} L${ex+s*2*u},${ey-eh*0.3} L${ex+s*7*u},${ey+eh*0.2} Z" fill="${pal.markB}" opacity="0.4"/>`;
+    });
+  } else if (a === 'dog') {
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.75;
+      const ey = headY - headR * 0.1;
+      svg += `<ellipse cx="${ex}" cy="${ey}" rx="${10*u}" ry="${20*u}" fill="url(#${uid}-fur)" transform="rotate(${s*25},${ex},${ey})"/>`;
+      svg += `<ellipse cx="${ex}" cy="${ey+2*u}" rx="${7*u}" ry="${15*u}" fill="${pal.markA}" opacity="0.2" transform="rotate(${s*25},${ex},${ey})"/>`;
+    });
+  } else if (a === 'wolf') {
+    const eh = 26 * u;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.55;
+      const ey = headY - headR * 0.7;
+      svg += `<path d="M${ex-s*8*u},${ey+eh*0.4} L${ex},${ey-eh*0.6} L${ex+s*8*u},${ey+eh*0.4} Z" fill="url(#${uid}-fur)"/>`;
+      svg += `<path d="M${ex-s*5*u},${ey+eh*0.3} L${ex},${ey-eh*0.3} L${ex+s*5*u},${ey+eh*0.3} Z" fill="${pal.markB}" opacity="0.35"/>`;
+    });
   } else if (a === 'tiger') {
-    // 丸耳 + 縞模様
-    const er = 10 * u;
-    svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
-    svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
-    // stripes on face
-    for (let i = 0; i < 3; i++) {
-      const sy = fy - faceR * 0.3 + i * 6 * u;
-      svg += `<path d="M${cx - faceR * 0.8},${sy} Q${cx - faceR * 0.4},${sy - 2 * u} ${cx - faceR * 0.15},${sy + 1 * u}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" opacity="0.3" stroke-linecap="round"/>`;
-      svg += `<path d="M${cx + faceR * 0.15},${sy + 1 * u} Q${cx + faceR * 0.4},${sy - 2 * u} ${cx + faceR * 0.8},${sy}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" opacity="0.3" stroke-linecap="round"/>`;
-    }
+    const er = 12 * u;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.68;
+      const ey = headY - headR * 0.65;
+      svg += `<circle cx="${ex}" cy="${ey}" r="${er}" fill="url(#${uid}-fur)"/>`;
+      svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.55}" fill="#fff" opacity="0.25"/>`;
+    });
   } else if (a === 'deer') {
     // 枝角
-    const antH = 22 * u;
-    svg += `<path d="M${cx - faceR * 0.35},${fy - faceR * 0.85} L${cx - faceR * 0.5},${fy - faceR - antH} M${cx - faceR * 0.45},${fy - faceR - antH * 0.5} L${cx - faceR * 0.7},${fy - faceR - antH * 0.7}" fill="none" stroke="${c1}" stroke-width="${2.5 * u}" stroke-linecap="round" opacity="0.55"/>`;
-    svg += `<path d="M${cx + faceR * 0.35},${fy - faceR * 0.85} L${cx + faceR * 0.5},${fy - faceR - antH} M${cx + faceR * 0.45},${fy - faceR - antH * 0.5} L${cx + faceR * 0.7},${fy - faceR - antH * 0.7}" fill="none" stroke="${c1}" stroke-width="${2.5 * u}" stroke-linecap="round" opacity="0.55"/>`;
-    // small ears
-    svg += `<ellipse cx="${cx - faceR * 0.65}" cy="${fy - faceR * 0.55}" rx="${5 * u}" ry="${9 * u}" fill="url(#fur-${uid})" transform="rotate(-20,${cx - faceR * 0.65},${fy - faceR * 0.55})"/>`;
-    svg += `<ellipse cx="${cx + faceR * 0.65}" cy="${fy - faceR * 0.55}" rx="${5 * u}" ry="${9 * u}" fill="url(#fur-${uid})" transform="rotate(20,${cx + faceR * 0.65},${fy - faceR * 0.55})"/>`;
+    const ah = 30 * u;
+    [-1,1].forEach(s => {
+      const ax = cx + s * headR * 0.35;
+      const ay = headY - headR * 0.85;
+      svg += `<path d="M${ax},${ay} L${ax+s*8*u},${ay-ah*0.6} L${ax+s*15*u},${ay-ah*0.8} M${ax+s*8*u},${ay-ah*0.6} L${ax+s*5*u},${ay-ah}" fill="none" stroke="${pal.markA}" stroke-width="${3*u}" stroke-linecap="round" opacity="0.6"/>`;
+      // 角の先端の光
+      svg += `<circle cx="${ax+s*15*u}" cy="${ay-ah*0.8}" r="${2.5*u}" fill="${pal.glow}" opacity="0.4"/>`;
+      svg += `<circle cx="${ax+s*5*u}" cy="${ay-ah}" r="${2*u}" fill="${pal.glow}" opacity="0.35"/>`;
+    });
+    // 小さい耳
+    [-1,1].forEach(s => {
+      svg += `<ellipse cx="${cx+s*headR*0.65}" cy="${headY-headR*0.5}" rx="${6*u}" ry="${10*u}" fill="url(#${uid}-fur)" transform="rotate(${s*-20},${cx+s*headR*0.65},${headY-headR*0.5})"/>`;
+      svg += `<ellipse cx="${cx+s*headR*0.65}" cy="${headY-headR*0.48}" rx="${3.5*u}" ry="${7*u}" fill="#f9a8d4" opacity="0.35" transform="rotate(${s*-20},${cx+s*headR*0.65},${headY-headR*0.5})"/>`;
+    });
   } else if (a === 'eagle' || a === 'hawk') {
     // 冠羽
-    const featherH = 14 * u;
-    svg += `<path d="M${cx - 3 * u},${fy - faceR} L${cx},${fy - faceR - featherH} L${cx + 3 * u},${fy - faceR}" fill="${c1}" opacity="0.6"/>`;
-    svg += `<path d="M${cx - 8 * u},${fy - faceR * 0.9} L${cx - 5 * u},${fy - faceR - featherH * 0.7} L${cx - 1 * u},${fy - faceR * 0.85}" fill="${c2}" opacity="0.4"/>`;
-    svg += `<path d="M${cx + 1 * u},${fy - faceR * 0.85} L${cx + 5 * u},${fy - faceR - featherH * 0.7} L${cx + 8 * u},${fy - faceR * 0.9}" fill="${c2}" opacity="0.4"/>`;
-  } else if (a === 'dolphin') {
-    // 背びれ的なフィン
-    svg += `<path d="M${cx},${fy - faceR * 0.9} Q${cx + 4 * u},${fy - faceR - 14 * u} ${cx + 10 * u},${fy - faceR * 0.6}" fill="url(#fur-${uid})" opacity="0.7"/>`;
+    for (let i = 0; i < 3; i++) {
+      const fx = cx + (i-1) * 5 * u;
+      const fh = (20 - i * 3) * u;
+      svg += `<path d="M${fx-3*u},${headY-headR*0.85} L${fx},${headY-headR-fh} L${fx+3*u},${headY-headR*0.85}" fill="${i===1?pal.body:pal.bodyL}" opacity="${i===1?0.7:0.45}"/>`;
+    }
   } else if (a === 'butterfly') {
     // 触角
-    svg += `<path d="M${cx - 4 * u},${fy - faceR * 0.85} Q${cx - 10 * u},${fy - faceR - 18 * u} ${cx - 14 * u},${fy - faceR - 16 * u}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" stroke-linecap="round" opacity="0.6"/>`;
-    svg += `<path d="M${cx + 4 * u},${fy - faceR * 0.85} Q${cx + 10 * u},${fy - faceR - 18 * u} ${cx + 14 * u},${fy - faceR - 16 * u}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" stroke-linecap="round" opacity="0.6"/>`;
-    svg += `<circle cx="${cx - 14 * u}" cy="${fy - faceR - 16 * u}" r="${2.5 * u}" fill="${accent}" opacity="0.6"/>`;
-    svg += `<circle cx="${cx + 14 * u}" cy="${fy - faceR - 16 * u}" r="${2.5 * u}" fill="${accent}" opacity="0.6"/>`;
-    // 翼
-    svg += `<ellipse cx="${cx - bodyW - 6 * u}" cy="${fy + 20 * u}" rx="${18 * u}" ry="${22 * u}" fill="${c2}" opacity="0.3" transform="rotate(-15,${cx - bodyW},${fy + 20 * u})"/>`;
-    svg += `<ellipse cx="${cx + bodyW + 6 * u}" cy="${fy + 20 * u}" rx="${18 * u}" ry="${22 * u}" fill="${c2}" opacity="0.3" transform="rotate(15,${cx + bodyW},${fy + 20 * u})"/>`;
+    [-1,1].forEach(s => {
+      const bx = cx + s * 5 * u;
+      const by = headY - headR * 0.8;
+      svg += `<path d="M${bx},${by} Q${bx+s*12*u},${by-22*u} ${bx+s*16*u},${by-18*u}" fill="none" stroke="${pal.body}" stroke-width="${2*u}" stroke-linecap="round" opacity="0.7"/>`;
+      svg += `<circle cx="${bx+s*16*u}" cy="${by-18*u}" r="${3.5*u}" fill="${pal.glow}" opacity="0.7"/>`;
+      svg += `<circle cx="${bx+s*16*u}" cy="${by-18*u}" r="${2*u}" fill="#fff" opacity="0.4"/>`;
+    });
   } else if (a === 'otter') {
-    // 小さい丸耳
-    const er = 7 * u;
-    svg += `<circle cx="${cx - faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er}" fill="url(#fur-${uid})"/>`;
-    svg += `<circle cx="${cx + faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er}" fill="url(#fur-${uid})"/>`;
-    svg += `<circle cx="${cx - faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er * 0.5}" fill="${c2}" opacity="0.35"/>`;
-    svg += `<circle cx="${cx + faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er * 0.5}" fill="${c2}" opacity="0.35"/>`;
+    const er = 9 * u;
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.65;
+      const ey = headY - headR * 0.6;
+      svg += `<circle cx="${ex}" cy="${ey}" r="${er}" fill="url(#${uid}-fur)"/>`;
+      svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.55}" fill="${pal.belly}" opacity="0.4"/>`;
+    });
   }
 
-  // ─── 目 (共通・Big Five で変化) ───
-  const eyeY = fy - faceR * 0.05;
-  const eyeSp = faceR * 0.38;
+  // ── トラの縞模様 ──
+  if (a === 'tiger') {
+    for (let i = 0; i < 3; i++) {
+      const sy = headY - headR * 0.2 + i * 7 * u;
+      [-1,1].forEach(s => {
+        svg += `<path d="M${cx+s*headR*0.1},${sy} Q${cx+s*headR*0.4},${sy-3*u} ${cx+s*headR*0.8},${sy+2*u}" fill="none" stroke="${pal.markA}" stroke-width="${2*u}" opacity="0.25" stroke-linecap="round"/>`;
+      });
+    }
+  }
 
-  // パンダ: 目の周りの黒い模様
+  // ── パンダの目周り ──
   if (a === 'panda') {
-    svg += `<ellipse cx="${cx - eyeSp}" cy="${eyeY}" rx="${eyeSize * 1.8}" ry="${eyeSize * 1.6}" fill="${c1}" opacity="0.55"/>`;
-    svg += `<ellipse cx="${cx + eyeSp}" cy="${eyeY}" rx="${eyeSize * 1.8}" ry="${eyeSize * 1.6}" fill="${c1}" opacity="0.55"/>`;
+    const eyeY = headY - headR * 0.02;
+    const eyeSp = headR * 0.38;
+    svg += `<ellipse cx="${cx-eyeSp}" cy="${eyeY}" rx="${13*u}" ry="${12*u}" fill="${pal.markA}" opacity="0.6"/>`;
+    svg += `<ellipse cx="${cx+eyeSp}" cy="${eyeY}" rx="${13*u}" ry="${12*u}" fill="${pal.markA}" opacity="0.6"/>`;
   }
-  // フクロウ: 大きなディスク
+
+  // ── フクロウの顔ディスク ──
   if (a === 'owl') {
-    svg += `<circle cx="${cx - eyeSp}" cy="${eyeY}" r="${eyeSize * 2}" fill="#fff" opacity="0.2" stroke="${c1}" stroke-width="${0.8 * u}" stroke-opacity="0.2"/>`;
-    svg += `<circle cx="${cx + eyeSp}" cy="${eyeY}" r="${eyeSize * 2}" fill="#fff" opacity="0.2" stroke="${c1}" stroke-width="${0.8 * u}" stroke-opacity="0.2"/>`;
+    const eyeY = headY - headR * 0.02;
+    const eyeSp = headR * 0.38;
+    svg += `<circle cx="${cx-eyeSp}" cy="${eyeY}" r="${16*u}" fill="${pal.markB}" opacity="0.25" stroke="${pal.body}" stroke-width="${1*u}" stroke-opacity="0.15"/>`;
+    svg += `<circle cx="${cx+eyeSp}" cy="${eyeY}" r="${16*u}" fill="${pal.markB}" opacity="0.25" stroke="${pal.body}" stroke-width="${1*u}" stroke-opacity="0.15"/>`;
   }
+
+  // ═══ 目（大きなアニメ風キラキラ目） ═══
+  const eyeY = headY - headR * 0.02;
+  const eyeSp = headR * 0.38;
+  const eSize = lerp(9, 14, eyeScale) * u;
 
   [-1, 1].forEach(side => {
     const ex = cx + side * eyeSp;
-    const ew = eyeSize * (A > 0.5 ? 1.0 : 1.15);
-    const eh = eyeSize * (A > 0.5 ? 1.1 : 0.9);
-    // white
-    svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${ew}" ry="${eh}" fill="#fff" stroke="${c1}" stroke-width="${0.6 * u}" stroke-opacity="0.15"/>`;
-    // pupil
-    const pr = eyeSize * 0.5;
-    svg += `<circle cx="${ex}" cy="${eyeY + 0.5 * u}" r="${pr}" fill="${c1}"/>`;
-    svg += `<circle cx="${ex}" cy="${eyeY + 0.5 * u}" r="${pr * 0.5}" fill="${accent}" opacity="0.65"/>`;
-    // highlight
-    svg += `<circle cx="${ex - pr * 0.35}" cy="${eyeY - pr * 0.35}" r="${pr * 0.28}" fill="#fff" opacity="0.9"/>`;
-    if (sparkle) {
-      svg += `<circle cx="${ex + pr * 0.3}" cy="${eyeY - pr * 0.5}" r="${pr * 0.15}" fill="#fff" opacity="0.7"/>`;
-      svg += `<circle cx="${ex + pr * 0.1}" cy="${eyeY + pr * 0.4}" r="${pr * 0.1}" fill="#fff" opacity="0.5"/>`;
+    const ew = eSize * 1.1;
+    const eh = eSize * 1.2;
+
+    // 白目（大きめ）
+    svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${ew}" ry="${eh}" fill="#fff" stroke="${pal.markA}" stroke-width="${0.8*u}" stroke-opacity="0.12"/>`;
+
+    // 虹彩（リッチグラデーション）
+    const irisR = eSize * 0.75;
+    svg += `<circle cx="${ex}" cy="${eyeY+1*u}" r="${irisR}" fill="url(#${uid}-iris)"/>`;
+    // 虹彩の輝きリング
+    svg += `<circle cx="${ex}" cy="${eyeY+1*u}" r="${irisR}" fill="none" stroke="${pal.bodyL}" stroke-width="${0.6*u}" opacity="0.3"/>`;
+
+    // 瞳孔（深い色）
+    const pupilR = irisR * 0.55;
+    svg += `<circle cx="${ex}" cy="${eyeY+1.5*u}" r="${pupilR}" fill="${pal.markA}"/>`;
+
+    // メインハイライト（大きな白い丸）
+    svg += `<circle cx="${ex-irisR*0.3}" cy="${eyeY-irisR*0.3}" r="${irisR*0.35}" fill="#fff" opacity="0.95"/>`;
+    // サブハイライト
+    svg += `<circle cx="${ex+irisR*0.25}" cy="${eyeY-irisR*0.45}" r="${irisR*0.18}" fill="#fff" opacity="0.8"/>`;
+    // ボトムリフレクション
+    svg += `<ellipse cx="${ex}" cy="${eyeY+irisR*0.5}" rx="${irisR*0.35}" ry="${irisR*0.12}" fill="#fff" opacity="0.25"/>`;
+
+    // キラキラ（N:神経症的傾向 = 感受性 → 目の輝き強化）
+    if (N > 0.3) {
+      svg += `<circle cx="${ex+irisR*0.15}" cy="${eyeY+irisR*0.25}" r="${irisR*0.08}" fill="#fff" opacity="${lerp(0.3, 0.7, N).toFixed(2)}"/>`;
+      svg += `<circle cx="${ex-irisR*0.4}" cy="${eyeY+irisR*0.1}" r="${irisR*0.06}" fill="#fff" opacity="${lerp(0.2, 0.5, N).toFixed(2)}"/>`;
+    }
+    if (N > 0.6) {
+      // 十字キラキラ
+      const sx = ex + side * irisR * 0.4;
+      const sy = eyeY - irisR * 0.55;
+      const ss = irisR * 0.2;
+      svg += `<path d="M${sx},${sy-ss} L${sx},${sy+ss} M${sx-ss},${sy} L${sx+ss},${sy}" stroke="#fff" stroke-width="${0.8*u}" opacity="0.6" stroke-linecap="round"/>`;
     }
   });
 
-  // ─── 鼻 (動物別) ───
-  const noseY = fy + faceR * 0.2;
-  if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'lion' || a === 'wolf' || a === 'dog') {
-    // 逆三角形の鼻
-    const nw = 5 * u, nh = 4 * u;
-    svg += `<path d="M${cx},${noseY - nh / 2} L${cx - nw / 2},${noseY + nh / 2} L${cx + nw / 2},${noseY + nh / 2} Z" fill="${c1}" opacity="0.55"/>`;
-    // ヒゲ (cat, fox, tiger, otter)
-    if (a !== 'lion' && a !== 'wolf' && a !== 'dog') {
-      svg += `<line x1="${cx - nw}" y1="${noseY + nh * 0.3}" x2="${cx - faceR * 0.75}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
-      svg += `<line x1="${cx - nw}" y1="${noseY + nh}" x2="${cx - faceR * 0.8}" y2="${noseY + nh * 1.2}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
-      svg += `<line x1="${cx + nw}" y1="${noseY + nh * 0.3}" x2="${cx + faceR * 0.75}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
-      svg += `<line x1="${cx + nw}" y1="${noseY + nh}" x2="${cx + faceR * 0.8}" y2="${noseY + nh * 1.2}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
+  // ── まつ毛（A:協調性が高いと可愛いまつ毛） ──
+  if (A > 0.4) {
+    [-1,1].forEach(side => {
+      const ex = cx + side * eyeSp;
+      const lashLen = lerp(3, 7, A) * u;
+      for (let i = 0; i < 3; i++) {
+        const la = (i - 1) * 0.3 + side * 0.2;
+        const lx = ex + Math.cos(-Math.PI/2 + la) * eSize * 1.1;
+        const ly = eyeY + Math.sin(-Math.PI/2 + la) * eSize * 1.2;
+        const lx2 = lx + Math.cos(-Math.PI/2 + la) * lashLen;
+        const ly2 = ly + Math.sin(-Math.PI/2 + la) * lashLen;
+        svg += `<line x1="${lx.toFixed(1)}" y1="${ly.toFixed(1)}" x2="${lx2.toFixed(1)}" y2="${ly2.toFixed(1)}" stroke="${pal.markA}" stroke-width="${1.2*u}" stroke-linecap="round" opacity="0.35"/>`;
+      }
+    });
+  }
+
+  // ═══ 鼻 ═══
+  const noseY = headY + headR * 0.25;
+  if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'wolf' || a === 'dog' || a === 'lion' || a === 'otter') {
+    // 可愛い逆三角鼻
+    const nw = 6 * u, nh = 5 * u;
+    svg += `<path d="M${cx},${noseY-nh*0.3} Q${cx-nw*0.6},${noseY+nh*0.6} ${cx-nw*0.1},${noseY+nh*0.5} Q${cx},${noseY+nh*0.7} ${cx+nw*0.1},${noseY+nh*0.5} Q${cx+nw*0.6},${noseY+nh*0.6} ${cx},${noseY-nh*0.3}" fill="${pal.markA}" opacity="0.6"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${nw*0.35}" ry="${nh*0.2}" fill="#fff" opacity="0.2"/>`;
+    // ヒゲ
+    if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'otter') {
+      [-1,1].forEach(s => {
+        svg += `<line x1="${cx+s*4*u}" y1="${noseY+3*u}" x2="${cx+s*headR*0.8}" y2="${noseY}" stroke="${pal.markA}" stroke-width="${0.8*u}" opacity="0.18" stroke-linecap="round"/>`;
+        svg += `<line x1="${cx+s*4*u}" y1="${noseY+5*u}" x2="${cx+s*headR*0.85}" y2="${noseY+5*u}" stroke="${pal.markA}" stroke-width="${0.8*u}" opacity="0.15" stroke-linecap="round"/>`;
+        svg += `<line x1="${cx+s*4*u}" y1="${noseY+7*u}" x2="${cx+s*headR*0.75}" y2="${noseY+10*u}" stroke="${pal.markA}" stroke-width="${0.8*u}" opacity="0.12" stroke-linecap="round"/>`;
+      });
     }
   } else if (a === 'bear' || a === 'panda') {
-    // 丸鼻
-    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${4.5 * u}" ry="${3.5 * u}" fill="${c1}" opacity="0.5"/>`;
+    // マズル + 丸鼻
+    svg += `<ellipse cx="${cx}" cy="${noseY+4*u}" rx="${headR*0.3}" ry="${headR*0.2}" fill="${pal.belly}" opacity="0.5"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${5*u}" ry="${4*u}" fill="${pal.markA}" opacity="0.6"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY-1*u}" rx="${3*u}" ry="${2*u}" fill="#fff" opacity="0.2"/>`;
   } else if (a === 'rabbit' || a === 'deer') {
-    // 小さなY鼻
-    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${3 * u}" ry="${2 * u}" fill="#f9a8d4" opacity="0.6"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${4*u}" ry="${3*u}" fill="#f9a8d4" opacity="0.6"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY-1*u}" rx="${2.5*u}" ry="${1.5*u}" fill="#fff" opacity="0.25"/>`;
+    if (a === 'rabbit') {
+      // Y字口
+      svg += `<path d="M${cx},${noseY+3*u} L${cx},${noseY+7*u} M${cx},${noseY+7*u} Q${cx-4*u},${noseY+10*u} ${cx-6*u},${noseY+9*u} M${cx},${noseY+7*u} Q${cx+4*u},${noseY+10*u} ${cx+6*u},${noseY+9*u}" fill="none" stroke="${pal.markA}" stroke-width="${1*u}" opacity="0.2" stroke-linecap="round"/>`;
+    }
   } else if (a === 'eagle' || a === 'hawk') {
-    // くちばし
-    svg += `<path d="M${cx - 4 * u},${noseY - 2 * u} L${cx},${noseY + 7 * u} L${cx + 4 * u},${noseY - 2 * u} Z" fill="#f59e0b" opacity="0.7"/>`;
+    svg += `<path d="M${cx-5*u},${noseY} Q${cx},${noseY-3*u} ${cx+5*u},${noseY} L${cx},${noseY+8*u} Z" fill="#f59e0b" opacity="0.75"/>`;
+    svg += `<path d="M${cx-3*u},${noseY+1*u} Q${cx},${noseY-1*u} ${cx+3*u},${noseY+1*u} L${cx},${noseY+5*u} Z" fill="#fbbf24" opacity="0.35"/>`;
   } else if (a === 'owl') {
-    // 小さいくちばし
-    svg += `<path d="M${cx - 3 * u},${noseY} L${cx},${noseY + 5 * u} L${cx + 3 * u},${noseY} Z" fill="#f59e0b" opacity="0.6"/>`;
+    svg += `<path d="M${cx-4*u},${noseY+2*u} L${cx},${noseY+8*u} L${cx+4*u},${noseY+2*u} Z" fill="#f59e0b" opacity="0.7"/>`;
+    svg += `<path d="M${cx-2*u},${noseY+3*u} L${cx},${noseY+6*u} L${cx+2*u},${noseY+3*u} Z" fill="#fbbf24" opacity="0.35"/>`;
   } else if (a === 'dolphin') {
-    // 口先
-    svg += `<ellipse cx="${cx}" cy="${noseY + 2 * u}" rx="${faceR * 0.25}" ry="${3 * u}" fill="${c2}" opacity="0.25"/>`;
-  } else if (a === 'otter') {
-    // 丸い鼻 + ヒゲ
-    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${4 * u}" ry="${3 * u}" fill="${c1}" opacity="0.45"/>`;
-    svg += `<line x1="${cx - 5 * u}" y1="${noseY + 2 * u}" x2="${cx - faceR * 0.7}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
-    svg += `<line x1="${cx + 5 * u}" y1="${noseY + 2 * u}" x2="${cx + faceR * 0.7}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
-  } else {
-    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${2.5 * u}" ry="${1.5 * u}" fill="${c1}" opacity="0.3"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY+3*u}" rx="${headR*0.2}" ry="${4*u}" fill="${pal.markB}" opacity="0.3"/>`;
+  } else if (a === 'butterfly') {
+    svg += `<circle cx="${cx}" cy="${noseY}" r="${2*u}" fill="${pal.markA}" opacity="0.35"/>`;
   }
 
-  // ─── 頬紅 (N + A) ───
-  if (blush > 0.1) {
-    svg += `<ellipse cx="${cx - faceR * 0.5}" cy="${eyeY + faceR * 0.35}" rx="${faceR * 0.14}" ry="${faceR * 0.08}" fill="#f472b6" opacity="${blush.toFixed(2)}"/>`;
-    svg += `<ellipse cx="${cx + faceR * 0.5}" cy="${eyeY + faceR * 0.35}" rx="${faceR * 0.14}" ry="${faceR * 0.08}" fill="#f472b6" opacity="${blush.toFixed(2)}"/>`;
+  // ═══ 頬紅 ═══
+  if (blushAlpha > 0.08) {
+    [-1,1].forEach(s => {
+      const bx = cx + s * headR * 0.52;
+      const by = eyeY + headR * 0.3;
+      svg += `<ellipse cx="${bx}" cy="${by}" rx="${headR*0.16}" ry="${headR*0.08}" fill="#f472b6" opacity="${blushAlpha.toFixed(2)}"/>`;
+      // 頬紅の中のハイライト
+      if (blushAlpha > 0.3) {
+        svg += `<ellipse cx="${bx-2*u}" cy="${by-1*u}" rx="${headR*0.06}" ry="${headR*0.03}" fill="#fff" opacity="${(blushAlpha*0.3).toFixed(2)}"/>`;
+      }
+    });
   }
 
-  // ─── 口 (E:笑顔) ───
-  const mouthY = noseY + 6 * u;
-  if (a === 'eagle' || a === 'hawk' || a === 'owl') {
-    // 鳥類は口なし（くちばしで代用）
-  } else if (E > 0.55) {
-    svg += `<path d="M${cx - smileW},${mouthY} Q${cx},${mouthY + smileD * 2} ${cx + smileW},${mouthY}" fill="none" stroke="${c1}" stroke-width="${1.8 * u}" stroke-linecap="round" opacity="0.45"/>`;
-  } else if (E > 0.3) {
-    svg += `<path d="M${cx - smileW * 0.7},${mouthY} Q${cx},${mouthY + smileD * 1.2} ${cx + smileW * 0.7},${mouthY}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" stroke-linecap="round" opacity="0.35"/>`;
-  } else {
-    svg += `<path d="M${cx - smileW * 0.45},${mouthY} Q${cx},${mouthY + smileD * 0.5} ${cx + smileW * 0.45},${mouthY}" fill="none" stroke="${c1}" stroke-width="${1.2 * u}" stroke-linecap="round" opacity="0.25"/>`;
+  // ═══ 口（E:外向性で笑顔度合い変化） ═══
+  const mouthY = noseY + lerp(8, 10, E) * u;
+  if (a !== 'eagle' && a !== 'hawk' && a !== 'owl' && a !== 'rabbit') {
+    if (smileIntensity > 0.7) {
+      // 大きなニッコリ（ωタイプ）
+      const mw = lerp(6, 12, E) * u;
+      svg += `<path d="M${cx-mw},${mouthY-1*u} Q${cx-mw*0.5},${mouthY+5*u} ${cx},${mouthY+3*u} Q${cx+mw*0.5},${mouthY+5*u} ${cx+mw},${mouthY-1*u}" fill="none" stroke="${pal.markA}" stroke-width="${1.5*u}" stroke-linecap="round" opacity="0.4"/>`;
+    } else if (smileIntensity > 0.4) {
+      const mw = lerp(5, 9, E) * u;
+      svg += `<path d="M${cx-mw},${mouthY} Q${cx},${mouthY+4*u} ${cx+mw},${mouthY}" fill="none" stroke="${pal.markA}" stroke-width="${1.3*u}" stroke-linecap="round" opacity="0.3"/>`;
+    } else {
+      const mw = 5 * u;
+      svg += `<path d="M${cx-mw},${mouthY} Q${cx},${mouthY+2*u} ${cx+mw},${mouthY}" fill="none" stroke="${pal.markA}" stroke-width="${1*u}" stroke-linecap="round" opacity="0.2"/>`;
+    }
   }
 
-  // ─── 足 (C = 誠実性: 姿勢の良さ) ───
-  const footY = fy + 48 * u;
-  const footSpread = lerp(12, 16, C) * u;
-  svg += `<ellipse cx="${cx - footSpread}" cy="${footY}" rx="${7 * u}" ry="${4 * u}" fill="${c1}" opacity="0.35"/>`;
-  svg += `<ellipse cx="${cx + footSpread}" cy="${footY}" rx="${7 * u}" ry="${4 * u}" fill="${c1}" opacity="0.35"/>`;
-
-  // ─── 尻尾 (一部の動物) ───
-  if (a === 'cat' || a === 'fox' || a === 'dog' || a === 'wolf' || a === 'otter') {
-    const tailX = cx + bodyW * 0.8;
-    const tailY = fy + 36 * u;
-    const curl = a === 'fox' ? 16 * u : 10 * u;
-    svg += `<path d="M${tailX},${tailY} Q${tailX + curl},${tailY - curl} ${tailX + curl * 1.2},${tailY - curl * 0.3}" fill="none" stroke="url(#fur-${uid})" stroke-width="${5 * u}" stroke-linecap="round" opacity="0.6"/>`;
-  } else if (a === 'rabbit') {
-    svg += `<circle cx="${cx + bodyW * 0.7}" cy="${fy + 38 * u}" r="${5 * u}" fill="#fff" opacity="0.6"/>`;
+  // ═══ 模様マーキング（C:誠実性で整った模様） ═══
+  if (C > 0.5 && a !== 'butterfly' && a !== 'dolphin') {
+    const markOp = lerp(0.1, 0.25, C);
+    // 額のマーク
+    svg += `<path d="M${cx},${headY-headR*0.6} L${cx-3*u},${headY-headR*0.45} L${cx},${headY-headR*0.35} L${cx+3*u},${headY-headR*0.45} Z" fill="${pal.glow}" opacity="${markOp.toFixed(2)}"/>`;
   }
+
+  // ═══ 仕上げの輝き ═══
+  // 頭頂のハイライト
+  svg += `<ellipse cx="${cx-headR*0.15}" cy="${headY-headR*0.7}" rx="${headR*0.25}" ry="${headR*0.08}" fill="#fff" opacity="0.25" transform="rotate(-15,${cx},${headY})"/>`;
 
   svg += `</svg>`;
   return svg;
