@@ -8,7 +8,7 @@
 
 // ═══════════════════════════════════════════════════════════════
 // 1. Big Five 診断 (TIPI-J: Ten-Item Personality Inventory 日本語版)
-//    各次元 1-7 スケール × 2問 → 平均 → 5次元スコア
+//    各次元 1-5 スケール × 2問 → 平均 → 5次元スコア
 // ═══════════════════════════════════════════════════════════════
 
 const BIG5_QUESTIONS = [
@@ -31,13 +31,13 @@ const BIG5_QUESTIONS = [
 ];
 
 /**
- * 回答配列 (10個, 各1-7) → Big Five スコア { E, A, C, N, O } (各1-7)
+ * 回答配列 (10個, 各1-5) → Big Five スコア { E, A, C, N, O } (各1-5)
  */
 function calcBigFive(answers) {
   const dims = {};
   BIG5_QUESTIONS.forEach((q, i) => {
-    const raw = answers[i] || 4;
-    const val = q.dir === 1 ? raw : (8 - raw); // 逆転項目
+    const raw = answers[i] || 3;
+    const val = q.dir === 1 ? raw : (6 - raw); // 逆転項目 (5点満点)
     if (!dims[q.dim]) dims[q.dim] = [];
     dims[q.dim].push(val);
   });
@@ -45,7 +45,7 @@ function calcBigFive(answers) {
   for (const [dim, vals] of Object.entries(dims)) {
     scores[dim] = vals.reduce((a, b) => a + b, 0) / vals.length;
   }
-  return scores; // { E: 1-7, A: 1-7, C: 1-7, N: 1-7, O: 1-7 }
+  return scores; // { E: 1-5, A: 1-5, C: 1-5, N: 1-5, O: 1-5 }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -54,10 +54,10 @@ function calcBigFive(answers) {
 // ═══════════════════════════════════════════════════════════════
 
 function bigFiveToMBTI(b5) {
-  const I_E = b5.E >= 4 ? 'E' : 'I';       // 外向 vs 内向
-  const S_N = b5.O >= 4 ? 'N' : 'S';        // 直感 vs 感覚 (開放性↑=直感)
-  const T_F = b5.A >= 4 ? 'F' : 'T';        // 感情 vs 思考 (協調性↑=感情)
-  const J_P = b5.C >= 4 ? 'J' : 'P';        // 判断 vs 知覚 (誠実性↑=判断)
+  const I_E = b5.E >= 3 ? 'E' : 'I';       // 外向 vs 内向
+  const S_N = b5.O >= 3 ? 'N' : 'S';        // 直感 vs 感覚 (開放性↑=直感)
+  const T_F = b5.A >= 3 ? 'F' : 'T';        // 感情 vs 思考 (協調性↑=感情)
+  const J_P = b5.C >= 3 ? 'J' : 'P';        // 判断 vs 知覚 (誠実性↑=判断)
   return I_E + S_N + T_F + J_P;
 }
 
@@ -229,7 +229,7 @@ function getPersonalization(profile) {
   if (!profile || !profile.mbti) return getDefaultPersonalization();
   
   const mbti = MBTI_PROFILES[profile.mbti] || MBTI_PROFILES['INFP'];
-  const b5 = profile.bigFive || { E: 4, A: 4, C: 4, N: 4, O: 4 };
+  const b5 = profile.bigFive || { E: 3, A: 3, C: 3, N: 3, O: 3 };
   const level = profile.level || 1;
   const totalActs = profile.totalActivities || 0;
 
@@ -375,29 +375,29 @@ function buildStartMessages(mbti, b5) {
 function buildReviewInsights(mbti, b5) {
   // 性格に基づいたふりかえりの視点
   const insights = [];
-  if (b5.C >= 5) insights.push({ icon: '📊', text: '計画性の高いあなた。継続率を見てみよう' });
-  if (b5.C < 3) insights.push({ icon: '🎲', text: '自由なあなた。歩いた日の気分の良さを思い出して' });
-  if (b5.N >= 5) insights.push({ icon: '💆', text: '歩くことはストレス解消にも。心の変化に注目' });
-  if (b5.E >= 5) insights.push({ icon: '👥', text: '社交的なあなた。散歩で出会った景色を誰かに話そう' });
-  if (b5.E < 3) insights.push({ icon: '🧘', text: '静かな時間を楽しむあなた。ひとり歩きの価値を味わおう' });
-  if (b5.O >= 5) insights.push({ icon: '🗺️', text: '新しいルートを試すのも面白いかも' });
-  if (b5.A >= 5) insights.push({ icon: '💛', text: '優しいあなた。自分のことも褒めてあげて' });
+  if (b5.C >= 3.6) insights.push({ icon: '📊', text: '計画性の高いあなた。継続率を見てみよう' });
+  if (b5.C < 2.2) insights.push({ icon: '🎲', text: '自由なあなた。歩いた日の気分の良さを思い出して' });
+  if (b5.N >= 3.6) insights.push({ icon: '💆', text: '歩くことはストレス解消にも。心の変化に注目' });
+  if (b5.E >= 3.6) insights.push({ icon: '👥', text: '社交的なあなた。散歩で出会った景色を誰かに話そう' });
+  if (b5.E < 2.2) insights.push({ icon: '🧘', text: '静かな時間を楽しむあなた。ひとり歩きの価値を味わおう' });
+  if (b5.O >= 3.6) insights.push({ icon: '🗺️', text: '新しいルートを試すのも面白いかも' });
+  if (b5.A >= 3.6) insights.push({ icon: '💛', text: '優しいあなた。自分のことも褒めてあげて' });
   return insights;
 }
 
 function buildRiskAlerts(mbti, b5, totalActs) {
   const alerts = [];
   // 性格に基づいた離脱リスクアラート
-  if (b5.N >= 5 && totalActs > 3) {
+  if (b5.N >= 3.6 && totalActs > 3) {
     alerts.push({ type: 'gentle', msg: '完璧じゃなくていい。歩いた事実が全て。' });
   }
-  if (b5.C < 3 && totalActs > 5) {
+  if (b5.C < 2.2 && totalActs > 5) {
     alerts.push({ type: 'structure', msg: '「毎日同じ時間」じゃなくてOK。週3回でも十分。' });
   }
-  if (b5.E < 3 && totalActs > 10) {
+  if (b5.E < 2.2 && totalActs > 10) {
     alerts.push({ type: 'solo', msg: 'ひとりでここまで来た。それは、すごいこと。' });
   }
-  if (b5.O >= 5 && totalActs > 7) {
+  if (b5.O >= 3.6 && totalActs > 7) {
     alerts.push({ type: 'novelty', msg: '今日は違うルートを歩いてみる？' });
   }
   return alerts;
@@ -495,20 +495,20 @@ const MBTI_ANIMALS = {
  * MBTI + Big Five から高品質チビキャラ動物SVGアバターを生成
  * MindAxis風：リッチグラデーション、大きなキラキラ目、ファンタジー要素
  * @param {string} mbti - MBTIコード (例: "INFP")
- * @param {object} bigFive - { E, A, C, N, O } (各1-7)
+ * @param {object} bigFive - { E, A, C, N, O } (各1-5)
  * @param {number} size - SVGサイズ (default 200)
  * @returns {string} SVG文字列
  */
 function generateAvatar(mbti, bigFive, size = 200) {
   const prof = MBTI_PROFILES[mbti] || MBTI_PROFILES['INFP'];
   const animalInfo = MBTI_ANIMALS[mbti] || MBTI_ANIMALS['INFP'];
-  const b5 = bigFive || { E: 4, A: 4, C: 4, N: 4, O: 4 };
+  const b5 = bigFive || { E: 3, A: 3, C: 3, N: 3, O: 3 };
 
-  const E = (b5.E - 1) / 6; // 外向性
-  const A = (b5.A - 1) / 6; // 協調性
-  const C = (b5.C - 1) / 6; // 誠実性
-  const N = (b5.N - 1) / 6; // 神経症的傾向
-  const O = (b5.O - 1) / 6; // 開放性
+  const E = (b5.E - 1) / 4; // 外向性 (0-1)
+  const A = (b5.A - 1) / 4; // 協調性
+  const C = (b5.C - 1) / 4; // 誠実性
+  const N = (b5.N - 1) / 4; // 神経症的傾向
+  const O = (b5.O - 1) / 4; // 開放性
 
   const c1 = prof.gradientFrom;
   const c2 = prof.gradientTo;

@@ -64,7 +64,7 @@ function generateRadarChart(bigFive, color, size = 200) {
   let dataPts = [];
   for (let i = 0; i < 5; i++) {
     const ang = angleOff + (i * 2 * Math.PI / 5);
-    const val = (bigFive[labels[i].key] || 4) / 7;
+    const val = (bigFive[labels[i].key] || 3) / 5;
     const r = maxR * val;
     dataPts.push(`${(cx + Math.cos(ang) * r).toFixed(1)},${(cy + Math.sin(ang) * r).toFixed(1)}`);
   }
@@ -73,7 +73,7 @@ function generateRadarChart(bigFive, color, size = 200) {
   // データ点
   for (let i = 0; i < 5; i++) {
     const ang = angleOff + (i * 2 * Math.PI / 5);
-    const val = (bigFive[labels[i].key] || 4) / 7;
+    const val = (bigFive[labels[i].key] || 3) / 5;
     const r = maxR * val;
     const px = cx + Math.cos(ang) * r;
     const py = cy + Math.sin(ang) * r;
@@ -84,7 +84,7 @@ function generateRadarChart(bigFive, color, size = 200) {
   const labelR = maxR + size * 0.08;
   for (let i = 0; i < 5; i++) {
     const ang = angleOff + (i * 2 * Math.PI / 5);
-    const val = (bigFive[labels[i].key] || 4).toFixed(1);
+    const val = (bigFive[labels[i].key] || 3).toFixed(1);
     const cosA = Math.cos(ang);
     const sinA = Math.sin(ang);
 
@@ -288,7 +288,7 @@ function renderOnboarding() {
         <div class="likert" data-qi="${i}">
           <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px"><span>全く違う</span><span>とても当てはまる</span></div>
           <div style="display:flex;gap:6px;justify-content:center">
-            ${[1,2,3,4,5,6,7].map(v => `<button type="button" class="likert-btn" data-v="${v}">${v}</button>`).join('')}
+            ${[1,2,3,4,5].map(v => `<button type="button" class="likert-btn" data-v="${v}">${v}</button>`).join('')}
           </div>
         </div>
       </div>
@@ -399,8 +399,8 @@ function showDiagnosisResult(mbti, bigFive, isFirstTime) {
           </div>
           <!-- スキルバー風表示 -->
           ${Object.entries(bigFive).map(([dim, val]) => {
-            const pct = (val / 7 * 100).toFixed(0);
-            const lv = val >= 6 ? 'S' : val >= 5 ? 'A' : val >= 4 ? 'B' : val >= 3 ? 'C' : 'D';
+            const pct = (val / 5 * 100).toFixed(0);
+            const lv = val >= 4.3 ? 'S' : val >= 3.6 ? 'A' : val >= 2.8 ? 'B' : val >= 2 ? 'C' : 'D';
             return `
             <div style="margin-bottom:14px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -544,7 +544,7 @@ async function renderRecordPage() {
             <div style="position:absolute;bottom:10%;left:8%;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.04)"></div>
           </div>
           <div class="home-avatar-wrapper" style="margin:0 auto 8px;width:80px;height:80px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))">
-            ${Personality.generateAvatar(profile.mbti, b5 || {E:4,A:4,C:4,N:4,O:4}, 80)}
+            ${Personality.generateAvatar(profile.mbti, b5 || {E:3,A:3,C:3,N:3,O:3}, 80)}
           </div>
           <div style="font-size:13px;color:rgba(255,255,255,.8);font-weight:600;margin-bottom:2px">${(Personality.MBTI_ANIMALS && Personality.MBTI_ANIMALS[profile.mbti]) ? Personality.MBTI_ANIMALS[profile.mbti].name + ' · ' : ''}${mbti.emoji} ${mbti.label}</div>
         </div>
@@ -1138,8 +1138,8 @@ async function renderProfilePage() {
             ${generateRadarChart(b5, mbti.color, 360)}
           </div>
           ${Object.entries(b5).map(([dim, val]) => {
-            const pct = (val / 7 * 100).toFixed(0);
-            const lv = val >= 6 ? 'S' : val >= 5 ? 'A' : val >= 4 ? 'B' : val >= 3 ? 'C' : 'D';
+            const pct = (val / 5 * 100).toFixed(0);
+            const lv = val >= 4.3 ? 'S' : val >= 3.6 ? 'A' : val >= 2.8 ? 'B' : val >= 2 ? 'C' : 'D';
             return `
             <div style="margin-bottom:12px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
