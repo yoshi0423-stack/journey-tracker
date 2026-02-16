@@ -249,8 +249,9 @@ async function finishOnboarding(answers) {
 
 function showDiagnosisResult(mbti, bigFive, isFirstTime) {
   const info = Personality.MBTI_PROFILES[mbti];
+  const animalInfo = Personality.MBTI_ANIMALS ? Personality.MBTI_ANIMALS[mbti] : null;
   const app = document.getElementById('app');
-  const b5Labels = { E: '外向性', A: '協調性', C: '計画性', N: '感受性', O: '開放性' };
+  const b5Labels = { E: '外向性', A: '協調性', C: '誠実性', N: '神経症的傾向', O: '開放性' };
 
   app.innerHTML = `
     <div class="onboarding" style="padding:0 20px 100px">
@@ -258,14 +259,16 @@ function showDiagnosisResult(mbti, bigFive, isFirstTime) {
         <div style="width:160px;height:160px;margin:0 auto 12px">
           ${Personality.generateAvatar(mbti, bigFive, 160)}
         </div>
-        <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px">あなたは</div>
+        ${animalInfo ? `<div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px">あなたの性格動物は</div>
+        <div style="font-size:28px;font-weight:900;margin-bottom:2px">${animalInfo.name}</div>
+        <div style="font-size:15px;font-weight:700;color:${info.color};margin-bottom:4px">${info.label}（${mbti}）</div>` : `<div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px">あなたは</div>
         <div style="font-size:32px;font-weight:900;margin-bottom:4px">${info.label}</div>
-        <div style="font-size:18px;font-weight:700;color:${info.color};margin-bottom:12px">${mbti}</div>
+        <div style="font-size:18px;font-weight:700;color:${info.color};margin-bottom:12px">${mbti}</div>`}
         <div style="font-size:14px;color:var(--muted);line-height:1.6;max-width:300px;margin:0 auto">${info.desc}</div>
       </div>
 
       <div class="card fade-in">
-        <div style="font-weight:700;font-size:14px;margin-bottom:12px">Big Five プロフィール</div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:12px">ビッグファイブ プロフィール</div>
         ${Object.entries(bigFive).map(([dim, val]) => `
           <div style="margin-bottom:10px">
             <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
@@ -404,7 +407,7 @@ async function renderRecordPage() {
         <div class="home-avatar-wrapper" style="margin:0 auto 12px;width:80px;height:80px;filter:drop-shadow(0 4px 12px ${mbti.color}40)">
           ${Personality.generateAvatar(profile.mbti, b5 || {E:4,A:4,C:4,N:4,O:4}, 80)}
         </div>
-        <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:2px">${mbti.emoji} ${mbti.label}</div>
+        <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:2px">${(Personality.MBTI_ANIMALS && Personality.MBTI_ANIMALS[profile.mbti]) ? Personality.MBTI_ANIMALS[profile.mbti].name + ' · ' : ''}${mbti.emoji} ${mbti.label}</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text)">${homeMsg.greeting}</div>
         <div style="font-size:48px;font-weight:900" class="text-gradient">${distKm}<span style="font-size:18px;opacity:.6"> km</span></div>
         <div style="font-size:12px;color:var(--muted);margin-top:4px">${acts}回の記録 · ${days}日間の積み重ね</div>
@@ -916,7 +919,8 @@ async function renderProfilePage() {
 
   const mbti = Personality.MBTI_PROFILES[profile.mbti];
   const b5 = profile.bigFive;
-  const b5Labels = { E: '外向性', A: '協調性', C: '計画性', N: '感受性', O: '開放性' };
+  const b5Labels = { E: '外向性', A: '協調性', C: '誠実性', N: '神経症的傾向', O: '開放性' };
+  const animalInfo = Personality.MBTI_ANIMALS ? Personality.MBTI_ANIMALS[profile.mbti] : null;
   const lvl = p.levelInfo;
 
   page.innerHTML = `
@@ -940,8 +944,9 @@ async function renderProfilePage() {
         <div style="width:140px;height:140px;margin:0 auto 8px">
           ${Personality.generateAvatar(profile.mbti, b5, 140)}
         </div>
-        <div style="font-size:24px;font-weight:900">${mbti.label}</div>
-        <div style="font-size:16px;font-weight:700;color:${mbti.color};margin-bottom:8px">${profile.mbti}</div>
+        ${animalInfo ? `<div style="font-size:22px;font-weight:900">${animalInfo.name}</div>
+        <div style="font-size:14px;font-weight:700;color:${mbti.color};margin-bottom:4px">${mbti.label}（${profile.mbti}）</div>` : `<div style="font-size:24px;font-weight:900">${mbti.label}</div>
+        <div style="font-size:16px;font-weight:700;color:${mbti.color};margin-bottom:8px">${profile.mbti}</div>`}
         <div style="font-size:13px;color:var(--muted);line-height:1.5">${mbti.desc}</div>
       </div>
 
@@ -970,7 +975,7 @@ async function renderProfilePage() {
 
       <!-- Big Five -->
       <div class="card fade-in">
-        <div style="font-weight:700;font-size:15px;margin-bottom:12px">Big Five プロフィール</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px">ビッグファイブ プロフィール</div>
         ${Object.entries(b5).map(([dim, val]) => `
           <div style="margin-bottom:10px">
             <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">

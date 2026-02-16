@@ -19,10 +19,10 @@ const BIG5_QUESTIONS = [
   // A: Agreeableness（協調性）
   { dim: 'A', dir: +1, text: '他人に対して思いやりがある方だ' },
   { dim: 'A', dir: -1, text: '人と衝突しやすい方だ' },
-  // C: Conscientiousness（誠実性/計画性）
+  // C: Conscientiousness（誠実性）
   { dim: 'C', dir: +1, text: '物事をきちんと計画して実行する方だ' },
   { dim: 'C', dir: -1, text: '少しだらしないところがある' },
-  // N: Neuroticism（神経症傾向 / 情緒不安定性）
+  // N: Neuroticism（神経症的傾向）
   { dim: 'N', dir: +1, text: '不安を感じやすい方だ' },
   { dim: 'N', dir: -1, text: '感情的に安定している方だ' },
   // O: Openness（開放性）
@@ -462,12 +462,37 @@ function applyTheme(personalization) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 7. アバター生成エンジン – MBTI × Big Five → SVG
-//    性格特性から唯一無二のキャラクターアバターを生成
+// 7. アバター生成エンジン – MBTI × Big Five → 動物 SVG
+//    性格診断ごとに、MBTIタイプに対応した動物アバターを生成
+//    Big Five スコアで表情・体型・装飾がユニークに変化
 // ═══════════════════════════════════════════════════════════════
 
+/** MBTI → 動物マッピング */
+const MBTI_ANIMALS = {
+  // ─── Analyst (NT) ───
+  INTJ: { animal: 'owl',     name: 'フクロウ' },   // 賢明・戦略的
+  INTP: { animal: 'cat',     name: 'ネコ' },       // 好奇心・独立
+  ENTJ: { animal: 'lion',    name: 'ライオン' },   // 指揮・威厳
+  ENTP: { animal: 'fox',     name: 'キツネ' },     // 機知・遊び心
+  // ─── Diplomat (NF) ───
+  INFJ: { animal: 'wolf',    name: 'オオカミ' },   // 洞察・孤高
+  INFP: { animal: 'deer',    name: 'シカ' },       // 繊細・優美
+  ENFJ: { animal: 'dolphin', name: 'イルカ' },     // 社交・導き
+  ENFP: { animal: 'butterfly', name: 'チョウ' },   // 自由・好奇心
+  // ─── Sentinel (SJ) ───
+  ISTJ: { animal: 'bear',    name: 'クマ' },       // 堅実・力強さ
+  ISFJ: { animal: 'rabbit',  name: 'ウサギ' },     // 優しさ・守り
+  ESTJ: { animal: 'eagle',   name: 'ワシ' },       // 統率・鋭い目
+  ESFJ: { animal: 'dog',     name: 'イヌ' },       // 忠実・社交
+  // ─── Explorer (SP) ───
+  ISTP: { animal: 'hawk',    name: 'タカ' },       // 実践・独立
+  ISFP: { animal: 'panda',   name: 'パンダ' },     // 穏やか・感性
+  ESTP: { animal: 'tiger',   name: 'トラ' },       // 行動・大胆
+  ESFP: { animal: 'otter',   name: 'カワウソ' },   // 遊び心・楽観
+};
+
 /**
- * MBTI + Big Five からSVGアバターを生成
+ * MBTI + Big Five から動物SVGアバターを生成
  * @param {string} mbti - MBTIコード (例: "INFP")
  * @param {object} bigFive - { E, A, C, N, O } (各1-7)
  * @param {number} size - SVGサイズ (default 200)
@@ -475,216 +500,282 @@ function applyTheme(personalization) {
  */
 function generateAvatar(mbti, bigFive, size = 200) {
   const prof = MBTI_PROFILES[mbti] || MBTI_PROFILES['INFP'];
+  const animalInfo = MBTI_ANIMALS[mbti] || MBTI_ANIMALS['INFP'];
   const b5 = bigFive || { E: 4, A: 4, C: 4, N: 4, O: 4 };
-  // 正規化 0-1
+
   const E = (b5.E - 1) / 6;
   const A = (b5.A - 1) / 6;
   const C = (b5.C - 1) / 6;
   const N = (b5.N - 1) / 6;
   const O = (b5.O - 1) / 6;
+
   const c1 = prof.gradientFrom;
   const c2 = prof.gradientTo;
   const accent = prof.color;
-
-  // ─── ヘルパー ───
   const lerp = (a, b, t) => a + (b - a) * t;
   const cx = size / 2;
   const cy = size / 2;
-  const r = size * 0.36; // 顔半径
+  const u = size / 200; // unit scale
 
-  // ─── 顔の形状 (E:丸→楕円, C:左右対称度) ───
-  const faceRX = r * lerp(0.92, 1.08, E);
-  const faceRY = r * lerp(1.06, 0.94, E);
-
-  // ─── 肌色 (MBTIグループで変化) ───
-  const skinTones = {
-    NT: '#fef3c7', NF: '#fce7f3', SJ: '#e0f2fe', SP: '#fef9c3',
-  };
-  const group = mbti[1] === 'N' ? (mbti[2] === 'T' ? 'NT' : 'NF') : (mbti[3] === 'J' ? 'SJ' : 'SP');
-  const skin = skinTones[group];
-
-  // ─── 髪型 (O:開放性→ワイルド, C:計画性→整頓) ───
-  const hairWild = lerp(0, 12, O);
-  const hairNeat = lerp(0, 1, C);
-
-  // ─── 目 (E:大きさ, N:輝き, A:柔らかさ) ───
-  const eyeScale = lerp(0.8, 1.3, E);
-  const eyeSparkle = N > 0.5;
-  const eyeSoft = A > 0.5;
-
-  // ─── 口 (E:笑顔幅, A:柔らかさ) ───
-  const smileWidth = lerp(6, 16, E);
-  const smileDepth = lerp(2, 7, (E + A) / 2);
-
-  // ─── 頬紅 (N:感受性, A:協調性) ───
-  const blushOpacity = lerp(0, 0.5, (N + A) / 2);
-
-  // ─── オーラ/装飾 (O:開放性) ───
-  const hasAura = O > 0.55;
-  const numParticles = Math.floor(lerp(0, 8, O));
-
-  // ─── seed from mbti for deterministic randomness ───
+  // deterministic rng
   let seed = 0;
   for (let i = 0; i < mbti.length; i++) seed = seed * 31 + mbti.charCodeAt(i);
-  const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed / 0x7fffffff); };
+  const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
 
-  // ─── SVG 構築 ───
+  // uid for gradient IDs (prevent conflict when multiple SVGs)
+  const uid = mbti + size;
+
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">`;
   svg += `<defs>`;
-  svg += `<radialGradient id="av-bg" cx="50%" cy="40%"><stop offset="0%" stop-color="${c2}" stop-opacity="0.2"/><stop offset="100%" stop-color="${c1}" stop-opacity="0.08"/></radialGradient>`;
-  svg += `<radialGradient id="av-skin"><stop offset="0%" stop-color="${skin}"/><stop offset="100%" stop-color="${skin}" stop-opacity="0.95"/></radialGradient>`;
-  svg += `<linearGradient id="av-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient>`;
-  if (eyeSparkle) {
-    svg += `<radialGradient id="av-sparkle"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient>`;
-  }
+  svg += `<radialGradient id="bg-${uid}" cx="50%" cy="40%"><stop offset="0%" stop-color="${c2}" stop-opacity="0.18"/><stop offset="100%" stop-color="${c1}" stop-opacity="0.06"/></radialGradient>`;
+  svg += `<linearGradient id="fur-${uid}" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0%" stop-color="${c2}"/><stop offset="100%" stop-color="${c1}"/></linearGradient>`;
+  svg += `<radialGradient id="belly-${uid}" cx="50%" cy="45%"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#fff" stop-opacity="0.3"/></radialGradient>`;
   svg += `</defs>`;
 
-  // 背景円
-  svg += `<circle cx="${cx}" cy="${cy}" r="${size * 0.48}" fill="url(#av-bg)"/>`;
+  // background
+  svg += `<circle cx="${cx}" cy="${cy}" r="${size * 0.48}" fill="url(#bg-${uid})"/>`;
 
-  // ─── オーラパーティクル ───
-  if (hasAura) {
-    for (let i = 0; i < numParticles; i++) {
-      const angle = (i / numParticles) * Math.PI * 2 + rng() * 0.5;
-      const dist = size * lerp(0.38, 0.46, rng());
-      const px = cx + Math.cos(angle) * dist;
-      const py = cy + Math.sin(angle) * dist;
-      const ps = lerp(2, 5, rng());
-      const po = lerp(0.15, 0.45, rng());
-      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${ps.toFixed(1)}" fill="${accent}" opacity="${po.toFixed(2)}"><animate attributeName="opacity" values="${po.toFixed(2)};${(po*0.3).toFixed(2)};${po.toFixed(2)}" dur="${lerp(2,4,rng()).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+  // Big-Five driven params
+  const bodyW = lerp(0.28, 0.36, (E + A) / 2) * size;
+  const eyeSize = lerp(5, 10, E) * u;
+  const smileW = lerp(4, 14, E) * u;
+  const smileD = lerp(1, 6, (E + A) / 2) * u;
+  const blush = lerp(0, 0.45, (N + A) / 2);
+  const sparkle = N > 0.5;
+
+  // particles (O = 開放性)
+  const nPart = Math.floor(lerp(0, 7, O));
+  if (nPart > 0) {
+    for (let i = 0; i < nPart; i++) {
+      const ang = (i / nPart) * Math.PI * 2 + rng() * 0.6;
+      const dist = size * lerp(0.38, 0.47, rng());
+      const px = cx + Math.cos(ang) * dist;
+      const py = cy + Math.sin(ang) * dist;
+      const pr = lerp(1.5, 4.5, rng()) * u;
+      const po = lerp(0.12, 0.4, rng());
+      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${pr.toFixed(1)}" fill="${accent}" opacity="${po.toFixed(2)}"><animate attributeName="opacity" values="${po.toFixed(2)};${(po * 0.25).toFixed(2)};${po.toFixed(2)}" dur="${lerp(2, 4, rng()).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
     }
   }
 
-  // ─── 身体（肩） ───
-  const shoulderY = cy + r * 1.05;
-  const shoulderW = faceRX * 1.4;
-  svg += `<ellipse cx="${cx}" cy="${shoulderY + size*0.12}" rx="${shoulderW}" ry="${size*0.15}" fill="${c1}" opacity="0.15"/>`;
+  // ─── 動物ごとの描画 ───
+  const a = animalInfo.animal;
+  const fy = cy + 4 * u; // face center y (slightly lower)
 
-  // ─── 髪（後ろ） ───
-  const hairTop = cy - faceRY * 1.05;
-  const hairSideL = cx - faceRX * 1.15 - hairWild * 0.5;
-  const hairSideR = cx + faceRX * 1.15 + hairWild * 0.5;
-  svg += `<path d="M${hairSideL},${cy + faceRY * 0.3} Q${hairSideL - hairWild * 0.3},${hairTop - hairWild} ${cx},${hairTop - 8 - hairWild * 0.5} Q${hairSideR + hairWild * 0.3},${hairTop - hairWild} ${hairSideR},${cy + faceRY * 0.3} Z" fill="url(#av-hair)" opacity="0.9"/>`;
+  // 共通: 体 (丸い胴体)
+  svg += `<ellipse cx="${cx}" cy="${fy + 30 * u}" rx="${bodyW}" ry="${28 * u}" fill="url(#fur-${uid})"/>`;
+  svg += `<ellipse cx="${cx}" cy="${fy + 32 * u}" rx="${bodyW * 0.65}" ry="${18 * u}" fill="url(#belly-${uid})"/>`;
 
-  // ─── 顔 ───
-  svg += `<ellipse cx="${cx}" cy="${cy}" rx="${faceRX}" ry="${faceRY}" fill="url(#av-skin)" stroke="${c1}" stroke-width="1" stroke-opacity="0.1"/>`;
+  // 共通: 顔
+  const faceR = lerp(26, 32, (E + O) / 2) * u;
+  svg += `<circle cx="${cx}" cy="${fy}" r="${faceR}" fill="url(#fur-${uid})"/>`;
+  // 顔のハイライト
+  svg += `<ellipse cx="${cx}" cy="${fy + faceR * 0.08}" rx="${faceR * 0.7}" ry="${faceR * 0.55}" fill="#fff" opacity="0.12"/>`;
 
-  // ─── 髪（前髪） ───
-  const bangsY = cy - faceRY * 0.55;
-  if (hairNeat > 0.5) {
-    // 整った前髪
-    svg += `<path d="M${cx - faceRX * 0.85},${bangsY + 4} Q${cx},${bangsY - 10 - hairWild * 0.5} ${cx + faceRX * 0.85},${bangsY + 4} L${cx + faceRX * 1.05},${hairTop + 5} Q${cx},${hairTop - 5} ${cx - faceRX * 1.05},${hairTop + 5} Z" fill="url(#av-hair)"/>`;
-  } else {
-    // ワイルドな前髪
-    const spikes = 3 + Math.floor(O * 3);
-    let path = `M${cx - faceRX * 0.95},${bangsY + 8}`;
-    for (let i = 0; i <= spikes; i++) {
-      const t = i / spikes;
-      const sx = cx - faceRX * 0.95 + t * faceRX * 1.9;
-      const spikeH = hairWild * (0.5 + rng() * 0.8) + 8;
-      if (i < spikes) path += ` Q${sx + faceRX * 0.1},${bangsY - spikeH} ${sx + faceRX * 0.2},${bangsY + 3}`;
-    }
-    path += ` L${cx + faceRX * 1.05},${hairTop + 5} Q${cx},${hairTop - 5 - hairWild} ${cx - faceRX * 1.05},${hairTop + 5} Z`;
-    svg += `<path d="${path}" fill="url(#av-hair)"/>`;
-  }
-
-  // ─── 眉 (C:角度, E:太さ) ───
-  const browY = cy - faceRY * 0.22;
-  const browLen = faceRX * 0.3;
-  const browLift = lerp(0, -4, C); // 計画性高い→キリッと上がる
-  const browThick = lerp(1.5, 2.5, E);
-  svg += `<line x1="${cx - faceRX * 0.35}" y1="${browY}" x2="${cx - faceRX * 0.35 + browLen}" y2="${browY + browLift}" stroke="${c1}" stroke-width="${browThick}" stroke-linecap="round" opacity="0.5"/>`;
-  svg += `<line x1="${cx + faceRX * 0.35 - browLen}" y1="${browY + browLift}" x2="${cx + faceRX * 0.35}" y2="${browY}" stroke="${c1}" stroke-width="${browThick}" stroke-linecap="round" opacity="0.5"/>`;
-
-  // ─── 目 ───
-  const eyeY = cy - faceRY * 0.08;
-  const eyeSpacing = faceRX * 0.32;
-  const eyeW = 7 * eyeScale;
-  const eyeH = 8 * eyeScale;
-  const pupilR = 3.5 * eyeScale;
-
-  // 目の白
-  [-1, 1].forEach(side => {
-    const ex = cx + side * eyeSpacing;
-    if (eyeSoft) {
-      // 柔らかい丸目
-      svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${eyeW}" ry="${eyeH}" fill="#fff" stroke="${c1}" stroke-width="0.8" stroke-opacity="0.2"/>`;
+  // ─── 耳 (動物種別) ───
+  if (a === 'cat' || a === 'fox') {
+    // 三角耳
+    const earW = 14 * u, earH = 20 * u;
+    const tilt = a === 'fox' ? 4 * u : 2 * u;
+    svg += `<path d="M${cx - faceR * 0.65},${fy - faceR * 0.55} L${cx - faceR * 0.35 - tilt},${fy - faceR - earH} L${cx - faceR * 0.05},${fy - faceR * 0.45} Z" fill="url(#fur-${uid})"/>`;
+    svg += `<path d="M${cx + faceR * 0.05},${fy - faceR * 0.45} L${cx + faceR * 0.35 + tilt},${fy - faceR - earH} L${cx + faceR * 0.65},${fy - faceR * 0.55} Z" fill="url(#fur-${uid})"/>`;
+    // inner ear
+    svg += `<path d="M${cx - faceR * 0.55},${fy - faceR * 0.55} L${cx - faceR * 0.35 - tilt * 0.5},${fy - faceR - earH * 0.7} L${cx - faceR * 0.15},${fy - faceR * 0.5} Z" fill="#f9a8d4" opacity="0.5"/>`;
+    svg += `<path d="M${cx + faceR * 0.15},${fy - faceR * 0.5} L${cx + faceR * 0.35 + tilt * 0.5},${fy - faceR - earH * 0.7} L${cx + faceR * 0.55},${fy - faceR * 0.55} Z" fill="#f9a8d4" opacity="0.5"/>`;
+  } else if (a === 'rabbit') {
+    // 長い耳
+    const earH = 32 * u;
+    svg += `<ellipse cx="${cx - faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${6 * u}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(-10,${cx - faceR * 0.35},${fy - faceR})"/>`;
+    svg += `<ellipse cx="${cx + faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${6 * u}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(10,${cx + faceR * 0.35},${fy - faceR})"/>`;
+    svg += `<ellipse cx="${cx - faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${3.5 * u}" ry="${earH * 0.75}" fill="#f9a8d4" opacity="0.45" transform="rotate(-10,${cx - faceR * 0.35},${fy - faceR})"/>`;
+    svg += `<ellipse cx="${cx + faceR * 0.35}" cy="${fy - faceR - earH * 0.4}" rx="${3.5 * u}" ry="${earH * 0.75}" fill="#f9a8d4" opacity="0.45" transform="rotate(10,${cx + faceR * 0.35},${fy - faceR})"/>`;
+  } else if (a === 'bear' || a === 'panda') {
+    // 丸耳
+    const er = 10 * u;
+    svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
+    svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
+    if (a === 'panda') {
+      svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.6}" fill="${c1}" opacity="0.7"/>`;
+      svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.6}" fill="${c1}" opacity="0.7"/>`;
     } else {
-      // シャープな目
-      svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${eyeW * 1.1}" ry="${eyeH * 0.85}" fill="#fff" stroke="${c1}" stroke-width="0.8" stroke-opacity="0.2"/>`;
+      svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.55}" fill="${c2}" opacity="0.4"/>`;
+      svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er * 0.55}" fill="${c2}" opacity="0.4"/>`;
     }
-    // 瞳
-    svg += `<circle cx="${ex}" cy="${eyeY + 0.5}" r="${pupilR}" fill="${c1}"/>`;
-    svg += `<circle cx="${ex}" cy="${eyeY + 0.5}" r="${pupilR * 0.55}" fill="${accent}" opacity="0.7"/>`;
-    // ハイライト
-    svg += `<circle cx="${ex - pupilR * 0.35}" cy="${eyeY - pupilR * 0.35}" r="${pupilR * 0.3}" fill="#fff" opacity="0.9"/>`;
-    // 追加キラキラ（感受性高い）
-    if (eyeSparkle) {
-      svg += `<circle cx="${ex + pupilR * 0.3}" cy="${eyeY - pupilR * 0.5}" r="${pupilR * 0.18}" fill="url(#av-sparkle)"/>`;
-      svg += `<circle cx="${ex + pupilR * 0.15}" cy="${eyeY + pupilR * 0.4}" r="${pupilR * 0.12}" fill="#fff" opacity="0.6"/>`;
+  } else if (a === 'owl') {
+    // 耳飾り羽
+    const earH = 16 * u;
+    svg += `<path d="M${cx - faceR * 0.6},${fy - faceR * 0.6} L${cx - faceR * 0.55},${fy - faceR - earH} L${cx - faceR * 0.2},${fy - faceR * 0.7} Z" fill="url(#fur-${uid})"/>`;
+    svg += `<path d="M${cx + faceR * 0.2},${fy - faceR * 0.7} L${cx + faceR * 0.55},${fy - faceR - earH} L${cx + faceR * 0.6},${fy - faceR * 0.6} Z" fill="url(#fur-${uid})"/>`;
+  } else if (a === 'dog') {
+    // 垂れ耳
+    const earW = 10 * u, earH = 20 * u;
+    svg += `<ellipse cx="${cx - faceR * 0.75}" cy="${fy - faceR * 0.1}" rx="${earW}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(20,${cx - faceR * 0.75},${fy - faceR * 0.1})"/>`;
+    svg += `<ellipse cx="${cx + faceR * 0.75}" cy="${fy - faceR * 0.1}" rx="${earW}" ry="${earH}" fill="url(#fur-${uid})" transform="rotate(-20,${cx + faceR * 0.75},${fy - faceR * 0.1})"/>`;
+  } else if (a === 'wolf') {
+    // 尖った耳
+    const earH = 22 * u;
+    svg += `<path d="M${cx - faceR * 0.6},${fy - faceR * 0.5} L${cx - faceR * 0.45},${fy - faceR - earH} L${cx - faceR * 0.1},${fy - faceR * 0.6} Z" fill="url(#fur-${uid})"/>`;
+    svg += `<path d="M${cx + faceR * 0.1},${fy - faceR * 0.6} L${cx + faceR * 0.45},${fy - faceR - earH} L${cx + faceR * 0.6},${fy - faceR * 0.5} Z" fill="url(#fur-${uid})"/>`;
+    svg += `<path d="M${cx - faceR * 0.5},${fy - faceR * 0.5} L${cx - faceR * 0.45},${fy - faceR - earH * 0.6} L${cx - faceR * 0.2},${fy - faceR * 0.55} Z" fill="${c2}" opacity="0.35"/>`;
+    svg += `<path d="M${cx + faceR * 0.2},${fy - faceR * 0.55} L${cx + faceR * 0.45},${fy - faceR - earH * 0.6} L${cx + faceR * 0.5},${fy - faceR * 0.5} Z" fill="${c2}" opacity="0.35"/>`;
+  } else if (a === 'lion') {
+    // たてがみ
+    const maneR = faceR * 1.35;
+    for (let i = 0; i < 12; i++) {
+      const ang = (i / 12) * Math.PI * 2;
+      const mr = maneR + rng() * 6 * u;
+      const px = cx + Math.cos(ang) * mr;
+      const py = fy + Math.sin(ang) * mr;
+      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${lerp(6, 10, rng()) * u}" fill="${c1}" opacity="${lerp(0.25, 0.5, rng()).toFixed(2)}"/>`;
+    }
+  } else if (a === 'tiger') {
+    // 丸耳 + 縞模様
+    const er = 10 * u;
+    svg += `<circle cx="${cx - faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
+    svg += `<circle cx="${cx + faceR * 0.7}" cy="${fy - faceR * 0.7}" r="${er}" fill="url(#fur-${uid})"/>`;
+    // stripes on face
+    for (let i = 0; i < 3; i++) {
+      const sy = fy - faceR * 0.3 + i * 6 * u;
+      svg += `<path d="M${cx - faceR * 0.8},${sy} Q${cx - faceR * 0.4},${sy - 2 * u} ${cx - faceR * 0.15},${sy + 1 * u}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" opacity="0.3" stroke-linecap="round"/>`;
+      svg += `<path d="M${cx + faceR * 0.15},${sy + 1 * u} Q${cx + faceR * 0.4},${sy - 2 * u} ${cx + faceR * 0.8},${sy}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" opacity="0.3" stroke-linecap="round"/>`;
+    }
+  } else if (a === 'deer') {
+    // 枝角
+    const antH = 22 * u;
+    svg += `<path d="M${cx - faceR * 0.35},${fy - faceR * 0.85} L${cx - faceR * 0.5},${fy - faceR - antH} M${cx - faceR * 0.45},${fy - faceR - antH * 0.5} L${cx - faceR * 0.7},${fy - faceR - antH * 0.7}" fill="none" stroke="${c1}" stroke-width="${2.5 * u}" stroke-linecap="round" opacity="0.55"/>`;
+    svg += `<path d="M${cx + faceR * 0.35},${fy - faceR * 0.85} L${cx + faceR * 0.5},${fy - faceR - antH} M${cx + faceR * 0.45},${fy - faceR - antH * 0.5} L${cx + faceR * 0.7},${fy - faceR - antH * 0.7}" fill="none" stroke="${c1}" stroke-width="${2.5 * u}" stroke-linecap="round" opacity="0.55"/>`;
+    // small ears
+    svg += `<ellipse cx="${cx - faceR * 0.65}" cy="${fy - faceR * 0.55}" rx="${5 * u}" ry="${9 * u}" fill="url(#fur-${uid})" transform="rotate(-20,${cx - faceR * 0.65},${fy - faceR * 0.55})"/>`;
+    svg += `<ellipse cx="${cx + faceR * 0.65}" cy="${fy - faceR * 0.55}" rx="${5 * u}" ry="${9 * u}" fill="url(#fur-${uid})" transform="rotate(20,${cx + faceR * 0.65},${fy - faceR * 0.55})"/>`;
+  } else if (a === 'eagle' || a === 'hawk') {
+    // 冠羽
+    const featherH = 14 * u;
+    svg += `<path d="M${cx - 3 * u},${fy - faceR} L${cx},${fy - faceR - featherH} L${cx + 3 * u},${fy - faceR}" fill="${c1}" opacity="0.6"/>`;
+    svg += `<path d="M${cx - 8 * u},${fy - faceR * 0.9} L${cx - 5 * u},${fy - faceR - featherH * 0.7} L${cx - 1 * u},${fy - faceR * 0.85}" fill="${c2}" opacity="0.4"/>`;
+    svg += `<path d="M${cx + 1 * u},${fy - faceR * 0.85} L${cx + 5 * u},${fy - faceR - featherH * 0.7} L${cx + 8 * u},${fy - faceR * 0.9}" fill="${c2}" opacity="0.4"/>`;
+  } else if (a === 'dolphin') {
+    // 背びれ的なフィン
+    svg += `<path d="M${cx},${fy - faceR * 0.9} Q${cx + 4 * u},${fy - faceR - 14 * u} ${cx + 10 * u},${fy - faceR * 0.6}" fill="url(#fur-${uid})" opacity="0.7"/>`;
+  } else if (a === 'butterfly') {
+    // 触角
+    svg += `<path d="M${cx - 4 * u},${fy - faceR * 0.85} Q${cx - 10 * u},${fy - faceR - 18 * u} ${cx - 14 * u},${fy - faceR - 16 * u}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" stroke-linecap="round" opacity="0.6"/>`;
+    svg += `<path d="M${cx + 4 * u},${fy - faceR * 0.85} Q${cx + 10 * u},${fy - faceR - 18 * u} ${cx + 14 * u},${fy - faceR - 16 * u}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" stroke-linecap="round" opacity="0.6"/>`;
+    svg += `<circle cx="${cx - 14 * u}" cy="${fy - faceR - 16 * u}" r="${2.5 * u}" fill="${accent}" opacity="0.6"/>`;
+    svg += `<circle cx="${cx + 14 * u}" cy="${fy - faceR - 16 * u}" r="${2.5 * u}" fill="${accent}" opacity="0.6"/>`;
+    // 翼
+    svg += `<ellipse cx="${cx - bodyW - 6 * u}" cy="${fy + 20 * u}" rx="${18 * u}" ry="${22 * u}" fill="${c2}" opacity="0.3" transform="rotate(-15,${cx - bodyW},${fy + 20 * u})"/>`;
+    svg += `<ellipse cx="${cx + bodyW + 6 * u}" cy="${fy + 20 * u}" rx="${18 * u}" ry="${22 * u}" fill="${c2}" opacity="0.3" transform="rotate(15,${cx + bodyW},${fy + 20 * u})"/>`;
+  } else if (a === 'otter') {
+    // 小さい丸耳
+    const er = 7 * u;
+    svg += `<circle cx="${cx - faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er}" fill="url(#fur-${uid})"/>`;
+    svg += `<circle cx="${cx + faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er}" fill="url(#fur-${uid})"/>`;
+    svg += `<circle cx="${cx - faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er * 0.5}" fill="${c2}" opacity="0.35"/>`;
+    svg += `<circle cx="${cx + faceR * 0.65}" cy="${fy - faceR * 0.65}" r="${er * 0.5}" fill="${c2}" opacity="0.35"/>`;
+  }
+
+  // ─── 目 (共通・Big Five で変化) ───
+  const eyeY = fy - faceR * 0.05;
+  const eyeSp = faceR * 0.38;
+
+  // パンダ: 目の周りの黒い模様
+  if (a === 'panda') {
+    svg += `<ellipse cx="${cx - eyeSp}" cy="${eyeY}" rx="${eyeSize * 1.8}" ry="${eyeSize * 1.6}" fill="${c1}" opacity="0.55"/>`;
+    svg += `<ellipse cx="${cx + eyeSp}" cy="${eyeY}" rx="${eyeSize * 1.8}" ry="${eyeSize * 1.6}" fill="${c1}" opacity="0.55"/>`;
+  }
+  // フクロウ: 大きなディスク
+  if (a === 'owl') {
+    svg += `<circle cx="${cx - eyeSp}" cy="${eyeY}" r="${eyeSize * 2}" fill="#fff" opacity="0.2" stroke="${c1}" stroke-width="${0.8 * u}" stroke-opacity="0.2"/>`;
+    svg += `<circle cx="${cx + eyeSp}" cy="${eyeY}" r="${eyeSize * 2}" fill="#fff" opacity="0.2" stroke="${c1}" stroke-width="${0.8 * u}" stroke-opacity="0.2"/>`;
+  }
+
+  [-1, 1].forEach(side => {
+    const ex = cx + side * eyeSp;
+    const ew = eyeSize * (A > 0.5 ? 1.0 : 1.15);
+    const eh = eyeSize * (A > 0.5 ? 1.1 : 0.9);
+    // white
+    svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${ew}" ry="${eh}" fill="#fff" stroke="${c1}" stroke-width="${0.6 * u}" stroke-opacity="0.15"/>`;
+    // pupil
+    const pr = eyeSize * 0.5;
+    svg += `<circle cx="${ex}" cy="${eyeY + 0.5 * u}" r="${pr}" fill="${c1}"/>`;
+    svg += `<circle cx="${ex}" cy="${eyeY + 0.5 * u}" r="${pr * 0.5}" fill="${accent}" opacity="0.65"/>`;
+    // highlight
+    svg += `<circle cx="${ex - pr * 0.35}" cy="${eyeY - pr * 0.35}" r="${pr * 0.28}" fill="#fff" opacity="0.9"/>`;
+    if (sparkle) {
+      svg += `<circle cx="${ex + pr * 0.3}" cy="${eyeY - pr * 0.5}" r="${pr * 0.15}" fill="#fff" opacity="0.7"/>`;
+      svg += `<circle cx="${ex + pr * 0.1}" cy="${eyeY + pr * 0.4}" r="${pr * 0.1}" fill="#fff" opacity="0.5"/>`;
     }
   });
 
-  // ─── 頬紅 ───
-  if (blushOpacity > 0.08) {
-    svg += `<ellipse cx="${cx - faceRX * 0.42}" cy="${eyeY + faceRY * 0.22}" rx="${faceRX * 0.14}" ry="${faceRY * 0.08}" fill="#f472b6" opacity="${blushOpacity.toFixed(2)}"/>`;
-    svg += `<ellipse cx="${cx + faceRX * 0.42}" cy="${eyeY + faceRY * 0.22}" rx="${faceRX * 0.14}" ry="${faceRY * 0.08}" fill="#f472b6" opacity="${blushOpacity.toFixed(2)}"/>`;
-  }
-
-  // ─── 鼻 ───
-  svg += `<ellipse cx="${cx}" cy="${cy + faceRY * 0.1}" rx="2.5" ry="1.5" fill="${c1}" opacity="0.12"/>`;
-
-  // ─── 口 ───
-  const mouthY = cy + faceRY * 0.3;
-  if (E > 0.55) {
-    // にっこり（開放的）
-    svg += `<path d="M${cx - smileWidth},${mouthY} Q${cx},${mouthY + smileDepth * 2} ${cx + smileWidth},${mouthY}" fill="none" stroke="${c1}" stroke-width="2" stroke-linecap="round" opacity="0.55"/>`;
-    if (E > 0.7) {
-      // 歯見せ笑顔
-      svg += `<path d="M${cx - smileWidth * 0.6},${mouthY + 1} Q${cx},${mouthY + smileDepth * 1.5} ${cx + smileWidth * 0.6},${mouthY + 1}" fill="#fff" stroke="none" opacity="0.7"/>`;
+  // ─── 鼻 (動物別) ───
+  const noseY = fy + faceR * 0.2;
+  if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'lion' || a === 'wolf' || a === 'dog') {
+    // 逆三角形の鼻
+    const nw = 5 * u, nh = 4 * u;
+    svg += `<path d="M${cx},${noseY - nh / 2} L${cx - nw / 2},${noseY + nh / 2} L${cx + nw / 2},${noseY + nh / 2} Z" fill="${c1}" opacity="0.55"/>`;
+    // ヒゲ (cat, fox, tiger, otter)
+    if (a !== 'lion' && a !== 'wolf' && a !== 'dog') {
+      svg += `<line x1="${cx - nw}" y1="${noseY + nh * 0.3}" x2="${cx - faceR * 0.75}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
+      svg += `<line x1="${cx - nw}" y1="${noseY + nh}" x2="${cx - faceR * 0.8}" y2="${noseY + nh * 1.2}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
+      svg += `<line x1="${cx + nw}" y1="${noseY + nh * 0.3}" x2="${cx + faceR * 0.75}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
+      svg += `<line x1="${cx + nw}" y1="${noseY + nh}" x2="${cx + faceR * 0.8}" y2="${noseY + nh * 1.2}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
     }
-  } else if (E > 0.3) {
-    // 穏やかな微笑み
-    svg += `<path d="M${cx - smileWidth * 0.7},${mouthY} Q${cx},${mouthY + smileDepth * 1.2} ${cx + smileWidth * 0.7},${mouthY}" fill="none" stroke="${c1}" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>`;
+  } else if (a === 'bear' || a === 'panda') {
+    // 丸鼻
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${4.5 * u}" ry="${3.5 * u}" fill="${c1}" opacity="0.5"/>`;
+  } else if (a === 'rabbit' || a === 'deer') {
+    // 小さなY鼻
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${3 * u}" ry="${2 * u}" fill="#f9a8d4" opacity="0.6"/>`;
+  } else if (a === 'eagle' || a === 'hawk') {
+    // くちばし
+    svg += `<path d="M${cx - 4 * u},${noseY - 2 * u} L${cx},${noseY + 7 * u} L${cx + 4 * u},${noseY - 2 * u} Z" fill="#f59e0b" opacity="0.7"/>`;
+  } else if (a === 'owl') {
+    // 小さいくちばし
+    svg += `<path d="M${cx - 3 * u},${noseY} L${cx},${noseY + 5 * u} L${cx + 3 * u},${noseY} Z" fill="#f59e0b" opacity="0.6"/>`;
+  } else if (a === 'dolphin') {
+    // 口先
+    svg += `<ellipse cx="${cx}" cy="${noseY + 2 * u}" rx="${faceR * 0.25}" ry="${3 * u}" fill="${c2}" opacity="0.25"/>`;
+  } else if (a === 'otter') {
+    // 丸い鼻 + ヒゲ
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${4 * u}" ry="${3 * u}" fill="${c1}" opacity="0.45"/>`;
+    svg += `<line x1="${cx - 5 * u}" y1="${noseY + 2 * u}" x2="${cx - faceR * 0.7}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
+    svg += `<line x1="${cx + 5 * u}" y1="${noseY + 2 * u}" x2="${cx + faceR * 0.7}" y2="${noseY}" stroke="${c1}" stroke-width="${0.8 * u}" opacity="0.2"/>`;
   } else {
-    // 控えめ（内向的）
-    svg += `<path d="M${cx - smileWidth * 0.5},${mouthY} Q${cx},${mouthY + smileDepth * 0.6} ${cx + smileWidth * 0.5},${mouthY}" fill="none" stroke="${c1}" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${2.5 * u}" ry="${1.5 * u}" fill="${c1}" opacity="0.3"/>`;
   }
 
-  // ─── MBTIシンボル装飾 ───
-  const symbolY = cy - faceRY - 16;
-  const symbols = {
-    INTJ: '♟', INTP: '∞', ENTJ: '⚡', ENTP: '💡',
-    INFJ: '🌊', INFP: '🌸', ENFJ: '✨', ENFP: '🦋',
-    ISTJ: '⬡', ISFJ: '🛡', ESTJ: '⚙', ESFJ: '♥',
-    ISTP: '▲', ISFP: '◆', ESTP: '⚡', ESFP: '★',
-  };
-  const sym = symbols[mbti] || '●';
-  svg += `<text x="${cx}" y="${symbolY}" text-anchor="middle" font-size="14" opacity="0.6">${sym}</text>`;
-
-  // ─── アクセサリ（タイプ別） ───
-  if (group === 'NT') {
-    // メガネ（知性）
-    const gY = eyeY;
-    const gW = eyeW * 1.5;
-    const gH = eyeH * 1.3;
-    svg += `<ellipse cx="${cx - eyeSpacing}" cy="${gY}" rx="${gW}" ry="${gH}" fill="none" stroke="${c1}" stroke-width="1.2" opacity="0.3"/>`;
-    svg += `<ellipse cx="${cx + eyeSpacing}" cy="${gY}" rx="${gW}" ry="${gH}" fill="none" stroke="${c1}" stroke-width="1.2" opacity="0.3"/>`;
-    svg += `<line x1="${cx - eyeSpacing + gW}" y1="${gY}" x2="${cx + eyeSpacing - gW}" y2="${gY}" stroke="${c1}" stroke-width="1" opacity="0.25"/>`;
-  } else if (group === 'NF') {
-    // 花/光のオーラ
-    for (let i = 0; i < 3; i++) {
-      const angle = -Math.PI * 0.6 + (i / 2) * Math.PI * 0.6;
-      const px = cx + Math.cos(angle) * (r + 8);
-      const py = cy - 5 + Math.sin(angle) * (r + 8);
-      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${c2}" opacity="0.35"><animate attributeName="r" values="3;4.5;3" dur="${(2 + i * 0.5).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
-    }
-  } else if (group === 'SJ') {
-    // 襟/ネクタイ（きちんと感）
-    svg += `<path d="M${cx - 8},${shoulderY - 2} L${cx},${shoulderY + 12} L${cx + 8},${shoulderY - 2}" fill="${c1}" opacity="0.2"/>`;
-    svg += `<path d="M${cx - 3},${shoulderY} L${cx},${shoulderY + 10} L${cx + 3},${shoulderY}" fill="${accent}" opacity="0.25"/>`;
+  // ─── 頬紅 (N + A) ───
+  if (blush > 0.1) {
+    svg += `<ellipse cx="${cx - faceR * 0.5}" cy="${eyeY + faceR * 0.35}" rx="${faceR * 0.14}" ry="${faceR * 0.08}" fill="#f472b6" opacity="${blush.toFixed(2)}"/>`;
+    svg += `<ellipse cx="${cx + faceR * 0.5}" cy="${eyeY + faceR * 0.35}" rx="${faceR * 0.14}" ry="${faceR * 0.08}" fill="#f472b6" opacity="${blush.toFixed(2)}"/>`;
   }
-  // SP → アクセサリなし（自由なスタイル）
+
+  // ─── 口 (E:笑顔) ───
+  const mouthY = noseY + 6 * u;
+  if (a === 'eagle' || a === 'hawk' || a === 'owl') {
+    // 鳥類は口なし（くちばしで代用）
+  } else if (E > 0.55) {
+    svg += `<path d="M${cx - smileW},${mouthY} Q${cx},${mouthY + smileD * 2} ${cx + smileW},${mouthY}" fill="none" stroke="${c1}" stroke-width="${1.8 * u}" stroke-linecap="round" opacity="0.45"/>`;
+  } else if (E > 0.3) {
+    svg += `<path d="M${cx - smileW * 0.7},${mouthY} Q${cx},${mouthY + smileD * 1.2} ${cx + smileW * 0.7},${mouthY}" fill="none" stroke="${c1}" stroke-width="${1.5 * u}" stroke-linecap="round" opacity="0.35"/>`;
+  } else {
+    svg += `<path d="M${cx - smileW * 0.45},${mouthY} Q${cx},${mouthY + smileD * 0.5} ${cx + smileW * 0.45},${mouthY}" fill="none" stroke="${c1}" stroke-width="${1.2 * u}" stroke-linecap="round" opacity="0.25"/>`;
+  }
+
+  // ─── 足 (C = 誠実性: 姿勢の良さ) ───
+  const footY = fy + 48 * u;
+  const footSpread = lerp(12, 16, C) * u;
+  svg += `<ellipse cx="${cx - footSpread}" cy="${footY}" rx="${7 * u}" ry="${4 * u}" fill="${c1}" opacity="0.35"/>`;
+  svg += `<ellipse cx="${cx + footSpread}" cy="${footY}" rx="${7 * u}" ry="${4 * u}" fill="${c1}" opacity="0.35"/>`;
+
+  // ─── 尻尾 (一部の動物) ───
+  if (a === 'cat' || a === 'fox' || a === 'dog' || a === 'wolf' || a === 'otter') {
+    const tailX = cx + bodyW * 0.8;
+    const tailY = fy + 36 * u;
+    const curl = a === 'fox' ? 16 * u : 10 * u;
+    svg += `<path d="M${tailX},${tailY} Q${tailX + curl},${tailY - curl} ${tailX + curl * 1.2},${tailY - curl * 0.3}" fill="none" stroke="url(#fur-${uid})" stroke-width="${5 * u}" stroke-linecap="round" opacity="0.6"/>`;
+  } else if (a === 'rabbit') {
+    svg += `<circle cx="${cx + bodyW * 0.7}" cy="${fy + 38 * u}" r="${5 * u}" fill="#fff" opacity="0.6"/>`;
+  }
 
   svg += `</svg>`;
   return svg;
@@ -710,6 +801,7 @@ window.Personality = {
   applyTheme,
   calcLevel,
   LEVELS,
+  MBTI_ANIMALS,
   generateAvatar,
   generateAvatarSmall,
 };
