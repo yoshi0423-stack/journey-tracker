@@ -38,7 +38,7 @@ function generateRadarChart(bigFive, color, size = 200) {
   const angleOff = -Math.PI / 2;
   const fs = Math.round(size * 0.052); // フォントサイズ
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw.toFixed(0)} ${vh.toFixed(0)}" width="100%" style="display:block;max-width:${size}px;margin:0 auto">`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw.toFixed(0)} ${vh.toFixed(0)}" width="100%" style="display:block;margin:0 auto">`;
   svg += `<defs><filter id="rc-glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
   // 背景グリッド
@@ -394,8 +394,8 @@ function showDiagnosisResult(mbti, bigFive, isFirstTime) {
             <div style="width:4px;height:20px;border-radius:2px;background:${info.color}"></div>
             <div style="font-weight:800;font-size:16px">ビッグファイブ プロフィール</div>
           </div>
-          <div style="max-width:320px;margin:0 auto 16px">
-            ${generateRadarChart(bigFive, info.color, 260)}
+          <div style="width:100%;margin:0 auto 16px">
+            ${generateRadarChart(bigFive, info.color, 360)}
           </div>
           <!-- スキルバー風表示 -->
           ${Object.entries(bigFive).map(([dim, val]) => {
@@ -1134,8 +1134,8 @@ async function renderProfilePage() {
             <div style="width:4px;height:20px;border-radius:2px;background:${mbti.color}"></div>
             <div style="font-weight:800;font-size:16px">ビッグファイブ プロフィール</div>
           </div>
-          <div style="max-width:320px;margin:0 auto 20px">
-            ${generateRadarChart(b5, mbti.color, 260)}
+          <div style="width:100%;margin:0 auto 20px">
+            ${generateRadarChart(b5, mbti.color, 360)}
           </div>
           ${Object.entries(b5).map(([dim, val]) => {
             const pct = (val / 7 * 100).toFixed(0);
