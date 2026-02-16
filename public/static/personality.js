@@ -467,28 +467,28 @@ function applyTheme(personalization) {
 //    Big Five スコアで表情・体型・装飾がユニークに変化
 // ═══════════════════════════════════════════════════════════════
 
-/** MBTI → 動物マッピング */
+/** MBTI → 動物マッピング（ファンタジー・神話の生物を含む） */
 const MBTI_ANIMALS = {
   // ─── Analyst (NT) ───
-  INTJ: { animal: 'owl',     name: 'フクロウ' },   // 賢明・戦略的
-  INTP: { animal: 'cat',     name: 'ネコ' },       // 好奇心・独立
-  ENTJ: { animal: 'lion',    name: 'ライオン' },   // 指揮・威厳
-  ENTP: { animal: 'fox',     name: 'キツネ' },     // 機知・遊び心
+  INTJ: { animal: 'dragon',   name: 'ドラゴン' },     // 叡智・戦略・孤高
+  INTP: { animal: 'cat',      name: 'ネコ' },         // 好奇心・独立
+  ENTJ: { animal: 'griffin',   name: 'グリフォン' },   // 統率・威厳・勇猛
+  ENTP: { animal: 'fox',      name: 'キツネ' },       // 機知・遊び心
   // ─── Diplomat (NF) ───
-  INFJ: { animal: 'wolf',    name: 'オオカミ' },   // 洞察・孤高
-  INFP: { animal: 'deer',    name: 'シカ' },       // 繊細・優美
-  ENFJ: { animal: 'dolphin', name: 'イルカ' },     // 社交・導き
-  ENFP: { animal: 'butterfly', name: 'チョウ' },   // 自由・好奇心
+  INFJ: { animal: 'unicorn',  name: 'ユニコーン' },   // 神秘・洞察・純粋
+  INFP: { animal: 'deer',     name: 'シカ' },         // 繊細・優美
+  ENFJ: { animal: 'phoenix',  name: 'フェニックス' }, // 導き・再生・情熱
+  ENFP: { animal: 'butterfly', name: 'チョウ' },      // 自由・好奇心
   // ─── Sentinel (SJ) ───
-  ISTJ: { animal: 'bear',    name: 'クマ' },       // 堅実・力強さ
-  ISFJ: { animal: 'rabbit',  name: 'ウサギ' },     // 優しさ・守り
-  ESTJ: { animal: 'eagle',   name: 'ワシ' },       // 統率・鋭い目
-  ESFJ: { animal: 'dog',     name: 'イヌ' },       // 忠実・社交
+  ISTJ: { animal: 'bear',     name: 'クマ' },         // 堅実・力強さ
+  ISFJ: { animal: 'rabbit',   name: 'ウサギ' },       // 優しさ・守り
+  ESTJ: { animal: 'eagle',    name: 'ワシ' },         // 統率・鋭い目
+  ESFJ: { animal: 'dog',      name: 'イヌ' },         // 忠実・社交
   // ─── Explorer (SP) ───
-  ISTP: { animal: 'hawk',    name: 'タカ' },       // 実践・独立
-  ISFP: { animal: 'panda',   name: 'パンダ' },     // 穏やか・感性
-  ESTP: { animal: 'tiger',   name: 'トラ' },       // 行動・大胆
-  ESFP: { animal: 'otter',   name: 'カワウソ' },   // 遊び心・楽観
+  ISTP: { animal: 'hawk',     name: 'タカ' },         // 実践・独立
+  ISFP: { animal: 'ninetails', name: '九尾の狐' },    // 感性・美意識・神秘
+  ESTP: { animal: 'tiger',    name: 'トラ' },         // 行動・大胆
+  ESFP: { animal: 'otter',    name: 'カワウソ' },     // 遊び心・楽観
 };
 
 /**
@@ -544,20 +544,20 @@ function generateAvatar(mbti, bigFive, size = 200) {
 
   // ═══ 動物カラーパレット（タイプ固有の自然色） ═══
   const PALETTES = {
-    owl:       { body: '#6c5ce7', bodyL: '#a29bfe', belly: '#ddd6fe', markA: '#4c3ec4', markB: '#c4b5fd', glow: '#8b5cf6' },
+    dragon:    { body: '#6c5ce7', bodyL: '#a29bfe', belly: '#ddd6fe', markA: '#4c3ec4', markB: '#c4b5fd', glow: '#8b5cf6' },
     cat:       { body: '#7c3aed', bodyL: '#c4b5fd', belly: '#ede9fe', markA: '#5b21b6', markB: '#ddd6fe', glow: '#a78bfa' },
-    lion:      { body: '#dc2626', bodyL: '#fca5a5', belly: '#fee2e2', markA: '#991b1b', markB: '#fecaca', glow: '#f87171' },
+    griffin:   { body: '#dc2626', bodyL: '#fca5a5', belly: '#fee2e2', markA: '#991b1b', markB: '#fecaca', glow: '#f87171' },
     fox:       { body: '#ea580c', bodyL: '#fdba74', belly: '#fff7ed', markA: '#c2410c', markB: '#fed7aa', glow: '#fb923c' },
-    wolf:      { body: '#0284c7', bodyL: '#7dd3fc', belly: '#e0f2fe', markA: '#075985', markB: '#bae6fd', glow: '#38bdf8' },
+    unicorn:   { body: '#0284c7', bodyL: '#7dd3fc', belly: '#e0f2fe', markA: '#075985', markB: '#bae6fd', glow: '#38bdf8' },
     deer:      { body: '#db2777', bodyL: '#f9a8d4', belly: '#fce7f3', markA: '#9d174d', markB: '#fbcfe8', glow: '#f472b6' },
-    dolphin:   { body: '#0891b2', bodyL: '#67e8f9', belly: '#e0f7fa', markA: '#155e75', markB: '#a5f3fc', glow: '#22d3ee' },
+    phoenix:   { body: '#f97316', bodyL: '#fdba74', belly: '#fff7ed', markA: '#c2410c', markB: '#fed7aa', glow: '#fb923c' },
     butterfly: { body: '#9333ea', bodyL: '#d8b4fe', belly: '#f5f3ff', markA: '#6b21a8', markB: '#e9d5ff', glow: '#c084fc' },
     bear:      { body: '#4b5563', bodyL: '#9ca3af', belly: '#e5e7eb', markA: '#374151', markB: '#d1d5db', glow: '#6b7280' },
     rabbit:    { body: '#0d9488', bodyL: '#5eead4', belly: '#ccfbf1', markA: '#115e59', markB: '#99f6e4', glow: '#2dd4bf' },
     eagle:     { body: '#1d4ed8', bodyL: '#93c5fd', belly: '#dbeafe', markA: '#1e3a8a', markB: '#bfdbfe', glow: '#60a5fa' },
     dog:       { body: '#059669', bodyL: '#6ee7b7', belly: '#d1fae5', markA: '#065f46', markB: '#a7f3d0', glow: '#34d399' },
     hawk:      { body: '#78716c', bodyL: '#d6d3d1', belly: '#f5f5f4', markA: '#44403c', markB: '#e7e5e4', glow: '#a8a29e' },
-    panda:     { body: '#e11d48', bodyL: '#fda4af', belly: '#fff1f2', markA: '#9f1239', markB: '#fecdd3', glow: '#fb7185' },
+    ninetails: { body: '#e11d48', bodyL: '#fda4af', belly: '#fff1f2', markA: '#9f1239', markB: '#fecdd3', glow: '#fb7185' },
     tiger:     { body: '#ea580c', bodyL: '#fdba74', belly: '#fff7ed', markA: '#9a3412', markB: '#fed7aa', glow: '#f97316' },
     otter:     { body: '#d946ef', bodyL: '#f0abfc', belly: '#fdf4ff', markA: '#a21caf', markB: '#f5d0fe', glow: '#e879f9' },
   };
@@ -625,7 +625,7 @@ function generateAvatar(mbti, bigFive, size = 200) {
   // ═══════════════ 動物別描画 ═══════════════
 
   // --- 尻尾（体の後ろに描画） ---
-  if (a === 'cat' || a === 'fox' || a === 'wolf' || a === 'dog' || a === 'tiger' || a === 'otter') {
+  if (a === 'cat' || a === 'fox' || a === 'dog' || a === 'tiger' || a === 'otter') {
     const tx = cx + bodyW * 0.75;
     const ty = bodyY + 5 * u;
     const curl = a === 'fox' ? 28 * u : 18 * u;
@@ -636,11 +636,57 @@ function generateAvatar(mbti, bigFive, size = 200) {
   } else if (a === 'rabbit') {
     svg += `<circle cx="${cx+bodyW*0.6}" cy="${bodyY+10*u}" r="${5*u}" fill="#fff" opacity="0.7"/>`;
     svg += `<circle cx="${cx+bodyW*0.6}" cy="${bodyY+10*u}" r="${3*u}" fill="${pal.belly}" opacity="0.5"/>`;
-  } else if (a === 'lion') {
+  } else if (a === 'griffin') {
+    // グリフォン: ライオンの尻尾 + 先端の房
     const tx = cx + bodyW * 0.7;
     const ty = bodyY;
     svg += `<path d="M${tx},${ty} Q${tx+20*u},${ty-15*u} ${tx+25*u},${ty-5*u}" fill="none" stroke="url(#${uid}-fur)" stroke-width="${5*u}" stroke-linecap="round" opacity="0.7"/>`;
     svg += `<circle cx="${tx+26*u}" cy="${ty-4*u}" r="${5*u}" fill="${pal.markA}" opacity="0.4"/>`;
+  } else if (a === 'dragon') {
+    // ドラゴン: 先端に矢尻のある尻尾
+    const tx = cx + bodyW * 0.7;
+    const ty = bodyY + 5 * u;
+    svg += `<path d="M${tx},${ty} Q${tx+18*u},${ty-20*u} ${tx+28*u},${ty-10*u}" fill="none" stroke="url(#${uid}-fur)" stroke-width="${5*u}" stroke-linecap="round" opacity="0.7"/>`;
+    // 矢尻
+    svg += `<path d="M${tx+25*u},${ty-12*u} L${tx+34*u},${ty-18*u} L${tx+30*u},${ty-6*u} Z" fill="${pal.body}" opacity="0.6"/>`;
+  } else if (a === 'unicorn') {
+    // ユニコーン: ふわふわの虹色尻尾
+    const tx = cx + bodyW * 0.65;
+    const ty = bodyY - 5 * u;
+    svg += `<path d="M${tx},${ty+8*u} Q${tx+20*u},${ty-15*u} ${tx+15*u},${ty-25*u}" fill="none" stroke="${pal.bodyL}" stroke-width="${8*u}" stroke-linecap="round" opacity="0.5"/>`;
+    svg += `<path d="M${tx+2*u},${ty+5*u} Q${tx+18*u},${ty-10*u} ${tx+12*u},${ty-22*u}" fill="none" stroke="${pal.glow}" stroke-width="${5*u}" stroke-linecap="round" opacity="0.3"/>`;
+    svg += `<circle cx="${tx+14*u}" cy="${ty-24*u}" r="${4*u}" fill="${pal.glow}" opacity="0.25"/>`;
+  } else if (a === 'phoenix') {
+    // フェニックス: 炎の尾羽
+    const tx = cx + bodyW * 0.5;
+    const ty = bodyY;
+    for (let i = 0; i < 5; i++) {
+      const fang = -0.3 + i * 0.25;
+      const flen = lerp(20, 35, rng()) * u;
+      const fx = tx + Math.cos(fang) * flen;
+      const fy = ty + Math.sin(fang) * flen + 5 * u;
+      const fw = lerp(4, 8, rng()) * u;
+      const fo = lerp(0.2, 0.5, rng());
+      svg += `<path d="M${tx},${ty+5*u} Q${(tx+fx)/2+rng()*8*u},${(ty+fy)/2-8*u} ${fx},${fy}" fill="none" stroke="${i%2===0?pal.body:pal.glow}" stroke-width="${fw}" stroke-linecap="round" opacity="${fo.toFixed(2)}"/>`;
+    }
+    // 炎の先端
+    svg += `<circle cx="${tx+30*u}" cy="${ty-5*u}" r="${5*u}" fill="${pal.glow}" opacity="0.3"><animate attributeName="opacity" values="0.3;0.1;0.3" dur="1.5s" repeatCount="indefinite"/></circle>`;
+  } else if (a === 'ninetails') {
+    // 九尾の狐: 9本の尻尾（扇状に広がる）
+    const tx = cx + bodyW * 0.5;
+    const ty = bodyY;
+    for (let i = 0; i < 9; i++) {
+      const tAng = -1.2 + (i / 8) * 2.4;
+      const tLen = lerp(18, 28, 0.5 + 0.5 * Math.sin(i * 0.7)) * u;
+      const tcx = tx + Math.cos(tAng) * tLen * 0.5;
+      const tcy = ty - Math.abs(Math.sin(tAng)) * tLen * 0.3;
+      const tex = tx + Math.cos(tAng) * tLen;
+      const tey = ty + Math.sin(tAng) * tLen * 0.4 - 5 * u;
+      const tOp = lerp(0.25, 0.55, 0.5 + 0.5 * Math.sin(i * 1.1));
+      svg += `<path d="M${tx},${ty} Q${tcx},${tcy-10*u} ${tex},${tey}" fill="none" stroke="url(#${uid}-fur)" stroke-width="${4*u}" stroke-linecap="round" opacity="${tOp.toFixed(2)}"/>`;
+      // 先端の光
+      svg += `<circle cx="${tex}" cy="${tey}" r="${2.5*u}" fill="${pal.glow}" opacity="${(tOp*0.5).toFixed(2)}"/>`;
+    }
   }
 
   // --- チョウの翼（体の後ろ） ---
@@ -660,22 +706,60 @@ function generateAvatar(mbti, bigFive, size = 200) {
     svg += `<circle cx="${cx+wsx+8*u}" cy="${wy-12*u}" r="${4*u}" fill="#fff" opacity="0.25"/>`;
   }
 
+  // --- フェニックスの炎翼（体の後ろ） ---
+  if (a === 'phoenix') {
+    const wsx = bodyW * 1.0;
+    const wy = bodyY - 15 * u;
+    [-1,1].forEach(s => {
+      // メイン翼
+      svg += `<path d="M${cx+s*bodyW*0.3},${wy+10*u} Q${cx+s*(wsx+15*u)},${wy-20*u} ${cx+s*(wsx+10*u)},${wy+15*u}" fill="${pal.bodyL}" opacity="0.45"/>`;
+      svg += `<path d="M${cx+s*bodyW*0.25},${wy+8*u} Q${cx+s*(wsx+10*u)},${wy-15*u} ${cx+s*(wsx+5*u)},${wy+12*u}" fill="${pal.glow}" opacity="0.25"/>`;
+      // 羽根の先端に炎
+      for (let i = 0; i < 3; i++) {
+        const fx = cx + s * (wsx + (8 - i * 4) * u);
+        const fy = wy - (10 - i * 8) * u;
+        svg += `<circle cx="${fx}" cy="${fy}" r="${(4-i)*u}" fill="${i===0?'#fbbf24':pal.glow}" opacity="${lerp(0.2,0.4,rng()).toFixed(2)}"><animate attributeName="opacity" values="${lerp(0.2,0.4,rng()).toFixed(2)};0.1;${lerp(0.2,0.4,rng()).toFixed(2)}" dur="${lerp(1,2,rng()).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+      }
+    });
+  }
+
+  // --- ドラゴンの翼（体の後ろ） ---
+  if (a === 'dragon') {
+    [-1,1].forEach(s => {
+      const wx = cx + s * bodyW * 0.3;
+      const wy = bodyY - 10 * u;
+      // 翼膜
+      svg += `<path d="M${wx},${wy} L${wx+s*30*u},${wy-25*u} L${wx+s*25*u},${wy-10*u} L${wx+s*35*u},${wy-15*u} L${wx+s*28*u},${wy+5*u} L${wx+s*20*u},${wy+10*u} Z" fill="${pal.bodyL}" opacity="0.35"/>`;
+      // 翼の骨
+      svg += `<path d="M${wx},${wy} L${wx+s*30*u},${wy-25*u}" fill="none" stroke="${pal.body}" stroke-width="${2*u}" opacity="0.4"/>`;
+      svg += `<path d="M${wx},${wy} L${wx+s*35*u},${wy-15*u}" fill="none" stroke="${pal.body}" stroke-width="${1.5*u}" opacity="0.3"/>`;
+    });
+  }
+
+  // --- グリフォンの翼（体の後ろ） ---
+  if (a === 'griffin') {
+    [-1,1].forEach(s => {
+      const wx = cx + s * bodyW * 0.35;
+      const wy = bodyY - 12 * u;
+      // 大きな鷲翼
+      svg += `<path d="M${wx},${wy+5*u} Q${wx+s*25*u},${wy-30*u} ${wx+s*35*u},${wy-10*u} Q${wx+s*30*u},${wy+5*u} ${wx+s*20*u},${wy+15*u} Z" fill="${pal.bodyL}" opacity="0.4"/>`;
+      // 羽根のディテール
+      for (let i = 0; i < 3; i++) {
+        const fy = wy - 5 * u + i * 8 * u;
+        svg += `<path d="M${wx+s*10*u},${fy} Q${wx+s*(20+i*5)*u},${fy-5*u} ${wx+s*(30-i*3)*u},${fy+2*u}" fill="none" stroke="${pal.body}" stroke-width="${1*u}" opacity="0.2"/>`;
+      }
+    });
+  }
+
   // --- 体（丸い胴体） ---
   svg += `<ellipse cx="${cx}" cy="${bodyY}" rx="${bodyW}" ry="${bodyH}" fill="url(#${uid}-fur)"/>`;
   svg += `<ellipse cx="${cx}" cy="${bodyY}" rx="${bodyW}" ry="${bodyH}" fill="url(#${uid}-hi)"/>`;
   // お腹
   svg += `<ellipse cx="${cx}" cy="${bodyY+4*u}" rx="${bodyW*0.6}" ry="${bodyH*0.65}" fill="url(#${uid}-belly)"/>`;
 
-  // --- イルカのヒレ ---
-  if (a === 'dolphin') {
-    svg += `<path d="M${cx+bodyW*0.4},${bodyY-bodyH*0.5} Q${cx+bodyW*0.8},${bodyY-bodyH*1.1} ${cx+bodyW*0.9},${bodyY-bodyH*0.3}" fill="url(#${uid}-fur)" opacity="0.7"/>`;
-    // 尾ビレ
-    svg += `<path d="M${cx+bodyW*0.5},${bodyY+bodyH*0.6} Q${cx+bodyW*1.1},${bodyY+bodyH*0.2} ${cx+bodyW*1.2},${bodyY+bodyH*0.8}" fill="url(#${uid}-fur)" opacity="0.6"/>`;
-  }
-
   // --- 腕/前足 ---
   const armY = bodyY - 2 * u;
-  if (a !== 'butterfly' && a !== 'dolphin') {
+  if (a !== 'butterfly' && a !== 'phoenix') {
     // 左腕
     svg += `<ellipse cx="${cx-bodyW*0.7}" cy="${armY+10*u}" rx="${8*u}" ry="${14*u}" fill="url(#${uid}-fur)" transform="rotate(15,${cx-bodyW*0.7},${armY+10*u})"/>`;
     svg += `<ellipse cx="${cx-bodyW*0.7}" cy="${armY+10*u}" rx="${8*u}" ry="${14*u}" fill="url(#${uid}-hi)" transform="rotate(15,${cx-bodyW*0.7},${armY+10*u})"/>`;
@@ -684,7 +768,7 @@ function generateAvatar(mbti, bigFive, size = 200) {
   }
 
   // --- 足 ---
-  if (a !== 'dolphin' && a !== 'butterfly') {
+  if (a !== 'phoenix' && a !== 'butterfly') {
     const footY = bodyY + bodyH - 4*u;
     const fsp = bodyW * 0.45;
     svg += `<ellipse cx="${cx-fsp}" cy="${footY}" rx="${9*u}" ry="${6*u}" fill="${pal.markA}" opacity="0.45"/>`;
@@ -693,8 +777,8 @@ function generateAvatar(mbti, bigFive, size = 200) {
     svg += `<ellipse cx="${cx+fsp}" cy="${footY}" rx="${6*u}" ry="${4*u}" fill="${pal.belly}" opacity="0.35"/>`;
   }
 
-  // ═══ ライオンのたてがみ（頭の後ろ） ═══
-  if (a === 'lion') {
+  // ═══ グリフォンのたてがみ（頭の後ろ） ═══
+  if (a === 'griffin') {
     const mr = headR * 1.45;
     for (let i = 0; i < 16; i++) {
       const ang = (i / 16) * Math.PI * 2;
@@ -704,8 +788,49 @@ function generateAvatar(mbti, bigFive, size = 200) {
       const cr = lerp(8, 14, rng()) * u;
       svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${cr.toFixed(1)}" fill="${lerpColor(pal.markA, pal.body, rng())}" opacity="${lerp(0.35, 0.65, rng()).toFixed(2)}"/>`;
     }
-    // 内側のなめらかなたてがみ
     svg += `<circle cx="${cx}" cy="${headY}" r="${headR*1.2}" fill="url(#${uid}-fur)" opacity="0.3"/>`;
+  }
+
+  // ═══ ドラゴンの角（頭の後ろ） ═══
+  if (a === 'dragon') {
+    [-1,1].forEach(s => {
+      const hx = cx + s * headR * 0.5;
+      const hy = headY - headR * 0.8;
+      svg += `<path d="M${hx},${hy} Q${hx+s*8*u},${hy-20*u} ${hx+s*12*u},${hy-16*u}" fill="none" stroke="${pal.body}" stroke-width="${3.5*u}" stroke-linecap="round" opacity="0.6"/>`;
+      svg += `<circle cx="${hx+s*12*u}" cy="${hy-16*u}" r="${2.5*u}" fill="${pal.glow}" opacity="0.4"/>`;
+    });
+  }
+
+  // ═══ ユニコーンの角（頭の後ろ） ═══
+  if (a === 'unicorn') {
+    const hornX = cx;
+    const hornY = headY - headR * 0.85;
+    const hornH = 28 * u;
+    // 螺旋模様の角
+    svg += `<path d="M${hornX-3*u},${hornY} L${hornX},${hornY-hornH} L${hornX+3*u},${hornY}" fill="url(#${uid}-fur)" opacity="0.8"/>`;
+    // 螺旋ライン
+    for (let i = 0; i < 4; i++) {
+      const sy = hornY - (i / 4) * hornH;
+      const sw = 3 * (1 - i / 4) * u;
+      svg += `<ellipse cx="${hornX}" cy="${sy}" rx="${sw}" ry="${1*u}" fill="#fff" opacity="${lerp(0.15, 0.4, i/4).toFixed(2)}"/>`;
+    }
+    // 角の先端の光
+    svg += `<circle cx="${hornX}" cy="${hornY-hornH}" r="${3*u}" fill="#fff" opacity="0.5"><animate attributeName="opacity" values="0.5;0.2;0.5" dur="2s" repeatCount="indefinite"/></circle>`;
+    svg += `<circle cx="${hornX}" cy="${hornY-hornH}" r="${6*u}" fill="${pal.glow}" opacity="0.15"><animate attributeName="r" values="${6*u};${8*u};${6*u}" dur="2s" repeatCount="indefinite"/></circle>`;
+  }
+
+  // ═══ フェニックスの冠羽（頭の後ろ） ═══
+  if (a === 'phoenix') {
+    for (let i = 0; i < 5; i++) {
+      const ang = -0.6 + (i / 4) * 1.2;
+      const flen = lerp(18, 26, 0.5 + 0.5 * Math.sin(i * 1.5)) * u;
+      const fx = cx + Math.sin(ang) * 4 * u;
+      const fy = headY - headR * 0.85;
+      const fex = fx + Math.sin(ang) * flen * 0.3;
+      const fey = fy - flen;
+      svg += `<path d="M${fx},${fy} Q${fx+Math.sin(ang)*8*u},${fy-flen*0.6} ${fex},${fey}" fill="none" stroke="${i%2===0?pal.body:'#fbbf24'}" stroke-width="${(3-i*0.3)*u}" stroke-linecap="round" opacity="${lerp(0.3,0.6,rng()).toFixed(2)}"/>`;
+      svg += `<circle cx="${fex}" cy="${fey}" r="${2*u}" fill="#fbbf24" opacity="0.4"/>`;
+    }
   }
 
   // ═══ 頭（大きい丸） ═══
@@ -719,10 +844,10 @@ function generateAvatar(mbti, bigFive, size = 200) {
   }
 
   // ═══ 耳（動物種別） ═══
-  if (a === 'cat' || a === 'fox') {
+  if (a === 'cat' || a === 'fox' || a === 'ninetails') {
     const eh = 24 * u;
     const ew = 16 * u;
-    const tilt = a === 'fox' ? 5 : 3;
+    const tilt = (a === 'fox' || a === 'ninetails') ? 5 : 3;
     [-1,1].forEach(s => {
       const ex = cx + s * headR * 0.6;
       const ey = headY - headR * 0.7;
@@ -740,25 +865,46 @@ function generateAvatar(mbti, bigFive, size = 200) {
       svg += `<ellipse cx="${ex}" cy="${ey-eh*0.3}" rx="${8*u}" ry="${eh}" fill="url(#${uid}-hi)" transform="rotate(${rot},${ex},${ey})"/>`;
       svg += `<ellipse cx="${ex}" cy="${ey-eh*0.25}" rx="${4.5*u}" ry="${eh*0.7}" fill="#f9a8d4" opacity="0.4" transform="rotate(${rot},${ex},${ey})"/>`;
     });
-  } else if (a === 'bear' || a === 'panda') {
+  } else if (a === 'bear') {
     const er = 12 * u;
     [-1,1].forEach(s => {
       const ex = cx + s * headR * 0.7;
       const ey = headY - headR * 0.65;
       svg += `<circle cx="${ex}" cy="${ey}" r="${er}" fill="url(#${uid}-fur)"/>`;
-      if (a === 'panda') {
-        svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.7}" fill="${pal.markA}" opacity="0.8"/>`;
-      } else {
-        svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.6}" fill="${pal.belly}" opacity="0.4"/>`;
-      }
+      svg += `<circle cx="${ex}" cy="${ey}" r="${er*0.6}" fill="${pal.belly}" opacity="0.4"/>`;
     });
-  } else if (a === 'owl') {
-    const eh = 20 * u;
+  } else if (a === 'dragon') {
+    // ドラゴン: 小さな翼状の耳飾り
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.6;
+      const ey = headY - headR * 0.6;
+      svg += `<path d="M${ex},${ey+6*u} L${ex+s*14*u},${ey-10*u} L${ex+s*8*u},${ey+4*u} L${ex+s*18*u},${ey-4*u} L${ex+s*10*u},${ey+8*u} Z" fill="url(#${uid}-fur)" opacity="0.7"/>`;
+      svg += `<path d="M${ex},${ey+6*u} L${ex+s*14*u},${ey-10*u}" fill="none" stroke="${pal.markA}" stroke-width="${1*u}" opacity="0.3"/>`;
+    });
+  } else if (a === 'unicorn') {
+    // ユニコーン: エルフ風の優雅な耳
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.7;
+      const ey = headY - headR * 0.35;
+      svg += `<path d="M${ex-s*2*u},${ey+8*u} Q${ex+s*10*u},${ey-5*u} ${ex+s*16*u},${ey-10*u}" fill="none" stroke="url(#${uid}-fur)" stroke-width="${5*u}" stroke-linecap="round" opacity="0.6"/>`;
+      svg += `<circle cx="${ex+s*16*u}" cy="${ey-10*u}" r="${2*u}" fill="${pal.glow}" opacity="0.3"/>`;
+    });
+  } else if (a === 'griffin') {
+    // グリフォン: ワシ型の冠羽 + 小さい耳
+    const eh = 18 * u;
     [-1,1].forEach(s => {
       const ex = cx + s * headR * 0.55;
       const ey = headY - headR * 0.65;
       svg += `<path d="M${ex-s*8*u},${ey+eh*0.4} L${ex+s*2*u},${ey-eh*0.6} L${ex+s*10*u},${ey+eh*0.3} Z" fill="url(#${uid}-fur)"/>`;
       svg += `<path d="M${ex-s*5*u},${ey+eh*0.3} L${ex+s*2*u},${ey-eh*0.3} L${ex+s*7*u},${ey+eh*0.2} Z" fill="${pal.markB}" opacity="0.4"/>`;
+    });
+  } else if (a === 'phoenix') {
+    // フェニックス: 小さな羽飾り耳
+    [-1,1].forEach(s => {
+      const ex = cx + s * headR * 0.6;
+      const ey = headY - headR * 0.55;
+      svg += `<path d="M${ex},${ey+4*u} L${ex+s*8*u},${ey-8*u} L${ex+s*12*u},${ey-4*u}" fill="none" stroke="${pal.body}" stroke-width="${3*u}" stroke-linecap="round" opacity="0.5"/>`;
+      svg += `<circle cx="${ex+s*12*u}" cy="${ey-4*u}" r="${2*u}" fill="#fbbf24" opacity="0.45"/>`;
     });
   } else if (a === 'dog') {
     [-1,1].forEach(s => {
@@ -766,14 +912,6 @@ function generateAvatar(mbti, bigFive, size = 200) {
       const ey = headY - headR * 0.1;
       svg += `<ellipse cx="${ex}" cy="${ey}" rx="${10*u}" ry="${20*u}" fill="url(#${uid}-fur)" transform="rotate(${s*25},${ex},${ey})"/>`;
       svg += `<ellipse cx="${ex}" cy="${ey+2*u}" rx="${7*u}" ry="${15*u}" fill="${pal.markA}" opacity="0.2" transform="rotate(${s*25},${ex},${ey})"/>`;
-    });
-  } else if (a === 'wolf') {
-    const eh = 26 * u;
-    [-1,1].forEach(s => {
-      const ex = cx + s * headR * 0.55;
-      const ey = headY - headR * 0.7;
-      svg += `<path d="M${ex-s*8*u},${ey+eh*0.4} L${ex},${ey-eh*0.6} L${ex+s*8*u},${ey+eh*0.4} Z" fill="url(#${uid}-fur)"/>`;
-      svg += `<path d="M${ex-s*5*u},${ey+eh*0.3} L${ex},${ey-eh*0.3} L${ex+s*5*u},${ey+eh*0.3} Z" fill="${pal.markB}" opacity="0.35"/>`;
     });
   } else if (a === 'tiger') {
     const er = 12 * u;
@@ -835,20 +973,20 @@ function generateAvatar(mbti, bigFive, size = 200) {
     }
   }
 
-  // ── パンダの目周り ──
-  if (a === 'panda') {
-    const eyeY = headY - headR * 0.02;
-    const eyeSp = headR * 0.38;
-    svg += `<ellipse cx="${cx-eyeSp}" cy="${eyeY}" rx="${13*u}" ry="${12*u}" fill="${pal.markA}" opacity="0.6"/>`;
-    svg += `<ellipse cx="${cx+eyeSp}" cy="${eyeY}" rx="${13*u}" ry="${12*u}" fill="${pal.markA}" opacity="0.6"/>`;
+  // ── 九尾の狐の目周り（神秘的な輝き） ──
+  if (a === 'ninetails') {
+    const eY = headY - headR * 0.02;
+    const eSp = headR * 0.38;
+    svg += `<ellipse cx="${cx-eSp}" cy="${eY}" rx="${13*u}" ry="${12*u}" fill="${pal.glow}" opacity="0.15"/>`;
+    svg += `<ellipse cx="${cx+eSp}" cy="${eY}" rx="${13*u}" ry="${12*u}" fill="${pal.glow}" opacity="0.15"/>`;
   }
 
-  // ── フクロウの顔ディスク ──
-  if (a === 'owl') {
-    const eyeY = headY - headR * 0.02;
-    const eyeSp = headR * 0.38;
-    svg += `<circle cx="${cx-eyeSp}" cy="${eyeY}" r="${16*u}" fill="${pal.markB}" opacity="0.25" stroke="${pal.body}" stroke-width="${1*u}" stroke-opacity="0.15"/>`;
-    svg += `<circle cx="${cx+eyeSp}" cy="${eyeY}" r="${16*u}" fill="${pal.markB}" opacity="0.25" stroke="${pal.body}" stroke-width="${1*u}" stroke-opacity="0.15"/>`;
+  // ── ドラゴンの目周り（鱗模様） ──
+  if (a === 'dragon') {
+    const eY = headY - headR * 0.02;
+    const eSp = headR * 0.38;
+    svg += `<circle cx="${cx-eSp}" cy="${eY}" r="${14*u}" fill="${pal.markB}" opacity="0.15" stroke="${pal.body}" stroke-width="${0.8*u}" stroke-opacity="0.1"/>`;
+    svg += `<circle cx="${cx+eSp}" cy="${eY}" r="${14*u}" fill="${pal.markB}" opacity="0.15" stroke="${pal.body}" stroke-width="${0.8*u}" stroke-opacity="0.1"/>`;
   }
 
   // ═══ 目（大きなアニメ風キラキラ目） ═══
@@ -913,20 +1051,20 @@ function generateAvatar(mbti, bigFive, size = 200) {
 
   // ═══ 鼻 ═══
   const noseY = headY + headR * 0.25;
-  if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'wolf' || a === 'dog' || a === 'lion' || a === 'otter') {
+  if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'ninetails' || a === 'dog' || a === 'otter') {
     // 可愛い逆三角鼻
     const nw = 6 * u, nh = 5 * u;
     svg += `<path d="M${cx},${noseY-nh*0.3} Q${cx-nw*0.6},${noseY+nh*0.6} ${cx-nw*0.1},${noseY+nh*0.5} Q${cx},${noseY+nh*0.7} ${cx+nw*0.1},${noseY+nh*0.5} Q${cx+nw*0.6},${noseY+nh*0.6} ${cx},${noseY-nh*0.3}" fill="${pal.markA}" opacity="0.6"/>`;
     svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${nw*0.35}" ry="${nh*0.2}" fill="#fff" opacity="0.2"/>`;
     // ヒゲ
-    if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'otter') {
+    if (a === 'cat' || a === 'fox' || a === 'tiger' || a === 'ninetails' || a === 'otter') {
       [-1,1].forEach(s => {
         svg += `<line x1="${cx+s*4*u}" y1="${noseY+3*u}" x2="${cx+s*headR*0.8}" y2="${noseY}" stroke="${pal.markA}" stroke-width="${0.8*u}" opacity="0.18" stroke-linecap="round"/>`;
         svg += `<line x1="${cx+s*4*u}" y1="${noseY+5*u}" x2="${cx+s*headR*0.85}" y2="${noseY+5*u}" stroke="${pal.markA}" stroke-width="${0.8*u}" opacity="0.15" stroke-linecap="round"/>`;
         svg += `<line x1="${cx+s*4*u}" y1="${noseY+7*u}" x2="${cx+s*headR*0.75}" y2="${noseY+10*u}" stroke="${pal.markA}" stroke-width="${0.8*u}" opacity="0.12" stroke-linecap="round"/>`;
       });
     }
-  } else if (a === 'bear' || a === 'panda') {
+  } else if (a === 'bear') {
     // マズル + 丸鼻
     svg += `<ellipse cx="${cx}" cy="${noseY+4*u}" rx="${headR*0.3}" ry="${headR*0.2}" fill="${pal.belly}" opacity="0.5"/>`;
     svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${5*u}" ry="${4*u}" fill="${pal.markA}" opacity="0.6"/>`;
@@ -938,14 +1076,21 @@ function generateAvatar(mbti, bigFive, size = 200) {
       // Y字口
       svg += `<path d="M${cx},${noseY+3*u} L${cx},${noseY+7*u} M${cx},${noseY+7*u} Q${cx-4*u},${noseY+10*u} ${cx-6*u},${noseY+9*u} M${cx},${noseY+7*u} Q${cx+4*u},${noseY+10*u} ${cx+6*u},${noseY+9*u}" fill="none" stroke="${pal.markA}" stroke-width="${1*u}" opacity="0.2" stroke-linecap="round"/>`;
     }
-  } else if (a === 'eagle' || a === 'hawk') {
+  } else if (a === 'eagle' || a === 'hawk' || a === 'griffin') {
     svg += `<path d="M${cx-5*u},${noseY} Q${cx},${noseY-3*u} ${cx+5*u},${noseY} L${cx},${noseY+8*u} Z" fill="#f59e0b" opacity="0.75"/>`;
     svg += `<path d="M${cx-3*u},${noseY+1*u} Q${cx},${noseY-1*u} ${cx+3*u},${noseY+1*u} L${cx},${noseY+5*u} Z" fill="#fbbf24" opacity="0.35"/>`;
-  } else if (a === 'owl') {
+  } else if (a === 'dragon') {
+    // ドラゴン: 小さなスリット鼻孔
+    svg += `<ellipse cx="${cx-3*u}" cy="${noseY+2*u}" rx="${2*u}" ry="${3*u}" fill="${pal.markA}" opacity="0.4"/>`;
+    svg += `<ellipse cx="${cx+3*u}" cy="${noseY+2*u}" rx="${2*u}" ry="${3*u}" fill="${pal.markA}" opacity="0.4"/>`;
+  } else if (a === 'unicorn') {
+    // ユニコーン: 小さく可愛い鼻
+    svg += `<ellipse cx="${cx}" cy="${noseY}" rx="${3.5*u}" ry="${2.5*u}" fill="${pal.markA}" opacity="0.35"/>`;
+    svg += `<ellipse cx="${cx}" cy="${noseY-0.5*u}" rx="${2*u}" ry="${1.2*u}" fill="#fff" opacity="0.2"/>`;
+  } else if (a === 'phoenix') {
+    // フェニックス: 小さなくちばし
     svg += `<path d="M${cx-4*u},${noseY+2*u} L${cx},${noseY+8*u} L${cx+4*u},${noseY+2*u} Z" fill="#f59e0b" opacity="0.7"/>`;
     svg += `<path d="M${cx-2*u},${noseY+3*u} L${cx},${noseY+6*u} L${cx+2*u},${noseY+3*u} Z" fill="#fbbf24" opacity="0.35"/>`;
-  } else if (a === 'dolphin') {
-    svg += `<ellipse cx="${cx}" cy="${noseY+3*u}" rx="${headR*0.2}" ry="${4*u}" fill="${pal.markB}" opacity="0.3"/>`;
   } else if (a === 'butterfly') {
     svg += `<circle cx="${cx}" cy="${noseY}" r="${2*u}" fill="${pal.markA}" opacity="0.35"/>`;
   }
@@ -965,7 +1110,7 @@ function generateAvatar(mbti, bigFive, size = 200) {
 
   // ═══ 口（E:外向性で笑顔度合い変化） ═══
   const mouthY = noseY + lerp(8, 10, E) * u;
-  if (a !== 'eagle' && a !== 'hawk' && a !== 'owl' && a !== 'rabbit') {
+  if (a !== 'eagle' && a !== 'hawk' && a !== 'griffin' && a !== 'phoenix' && a !== 'rabbit') {
     if (smileIntensity > 0.7) {
       // 大きなニッコリ（ωタイプ）
       const mw = lerp(6, 12, E) * u;
@@ -980,7 +1125,7 @@ function generateAvatar(mbti, bigFive, size = 200) {
   }
 
   // ═══ 模様マーキング（C:誠実性で整った模様） ═══
-  if (C > 0.5 && a !== 'butterfly' && a !== 'dolphin') {
+  if (C > 0.5 && a !== 'butterfly' && a !== 'phoenix') {
     const markOp = lerp(0.1, 0.25, C);
     // 額のマーク
     svg += `<path d="M${cx},${headY-headR*0.6} L${cx-3*u},${headY-headR*0.45} L${cx},${headY-headR*0.35} L${cx+3*u},${headY-headR*0.45} Z" fill="${pal.glow}" opacity="${markOp.toFixed(2)}"/>`;
