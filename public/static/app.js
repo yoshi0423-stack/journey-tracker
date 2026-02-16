@@ -21,19 +21,25 @@ const S = {
 // ─── Big Five レーダーチャート SVG生成 ───
 function generateRadarChart(bigFive, color, size = 200) {
   const labels = [
-    { key: 'O', label: '開放性' },
-    { key: 'C', label: '誠実性' },
-    { key: 'E', label: '外向性' },
-    { key: 'A', label: '協調性' },
-    { key: 'N', label: '神経症的傾向' }
+    { key: 'O', label: '開放性',       short: '開放性' },
+    { key: 'C', label: '誠実性',       short: '誠実性' },
+    { key: 'E', label: '外向性',       short: '外向性' },
+    { key: 'A', label: '協調性',       short: '協調性' },
+    { key: 'N', label: '神経症的傾向', short: '神経症的' }
   ];
-  const cx = size / 2, cy = size / 2;
-  const maxR = size * 0.36;
+
+  // viewBox を大きめに取ってラベル余白を確保
+  const pad = size * 0.28;           // ラベル用パディング
+  const vw = size + pad * 2;         // viewBox 幅
+  const vh = size + pad * 2;         // viewBox 高さ
+  const cx = vw / 2, cy = vh / 2;   // 中心
+  const maxR = size * 0.34;          // チャート半径
   const levels = 4;
   const angleOff = -Math.PI / 2;
+  const fs = Math.round(size * 0.052); // フォントサイズ
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">`;
-  svg += `<defs><filter id="rc-glow"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw.toFixed(0)} ${vh.toFixed(0)}" width="100%" style="display:block;max-width:${size}px;margin:0 auto">`;
+  svg += `<defs><filter id="rc-glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
 
   // 背景グリッド
   for (let lv = levels; lv >= 1; lv--) {
@@ -43,7 +49,7 @@ function generateRadarChart(bigFive, color, size = 200) {
       const ang = angleOff + (i * 2 * Math.PI / 5);
       pts.push(`${(cx + Math.cos(ang) * r).toFixed(1)},${(cy + Math.sin(ang) * r).toFixed(1)}`);
     }
-    svg += `<polygon points="${pts.join(' ')}" fill="none" stroke="${lv === levels ? '#e2e8f0' : '#f1f5f9'}" stroke-width="${lv === levels ? 1.5 : 0.8}"/>`;
+    svg += `<polygon points="${pts.join(' ')}" fill="${lv === levels ? '#f8fafc' : 'none'}" stroke="${lv === levels ? '#e2e8f0' : '#f1f5f9'}" stroke-width="${lv === levels ? 1.2 : 0.7}"/>`;
   }
 
   // 軸線
@@ -62,7 +68,7 @@ function generateRadarChart(bigFive, color, size = 200) {
     const r = maxR * val;
     dataPts.push(`${(cx + Math.cos(ang) * r).toFixed(1)},${(cy + Math.sin(ang) * r).toFixed(1)}`);
   }
-  svg += `<polygon points="${dataPts.join(' ')}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" filter="url(#rc-glow)"/>`;
+  svg += `<polygon points="${dataPts.join(' ')}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2" stroke-linejoin="round" filter="url(#rc-glow)"/>`;
 
   // データ点
   for (let i = 0; i < 5; i++) {
@@ -71,19 +77,33 @@ function generateRadarChart(bigFive, color, size = 200) {
     const r = maxR * val;
     const px = cx + Math.cos(ang) * r;
     const py = cy + Math.sin(ang) * r;
-    svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+    svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
   }
 
-  // ラベル
-  const labelR = maxR + size * 0.12;
+  // ラベル（余白内に収まるよう配置）
+  const labelR = maxR + size * 0.08;
   for (let i = 0; i < 5; i++) {
     const ang = angleOff + (i * 2 * Math.PI / 5);
-    const lx = cx + Math.cos(ang) * labelR;
-    const ly = cy + Math.sin(ang) * labelR;
     const val = (bigFive[labels[i].key] || 4).toFixed(1);
-    const anchor = Math.abs(Math.cos(ang)) < 0.1 ? 'middle' : (Math.cos(ang) > 0 ? 'start' : 'end');
-    svg += `<text x="${lx.toFixed(1)}" y="${(ly - 6).toFixed(1)}" text-anchor="${anchor}" font-size="${size * 0.055}" font-weight="700" fill="#374151">${labels[i].label}</text>`;
-    svg += `<text x="${lx.toFixed(1)}" y="${(ly + 8).toFixed(1)}" text-anchor="${anchor}" font-size="${size * 0.05}" font-weight="600" fill="${color}">${val}</text>`;
+    const cosA = Math.cos(ang);
+    const sinA = Math.sin(ang);
+
+    // ラベル位置（軸の延長上）
+    let lx = cx + cosA * labelR;
+    let ly = cy + sinA * labelR;
+
+    // text-anchor: 左右は start/end, 上下は middle
+    let anchor = 'middle';
+    if (cosA > 0.3) anchor = 'start';
+    else if (cosA < -0.3) anchor = 'end';
+
+    // 上の頂点は上に、下の頂点は下にずらす
+    let labelDy = 0;
+    if (sinA < -0.3) labelDy = -8;   // 上方向
+    else if (sinA > 0.3) labelDy = 12; // 下方向
+
+    svg += `<text x="${lx.toFixed(1)}" y="${(ly + labelDy).toFixed(1)}" text-anchor="${anchor}" font-size="${fs}" font-weight="700" fill="#475569" font-family="-apple-system,BlinkMacSystemFont,sans-serif">${labels[i].label}</text>`;
+    svg += `<text x="${lx.toFixed(1)}" y="${(ly + labelDy + fs + 3).toFixed(1)}" text-anchor="${anchor}" font-size="${fs}" font-weight="700" fill="${color}" font-family="-apple-system,BlinkMacSystemFont,sans-serif">${val}</text>`;
   }
 
   svg += `</svg>`;
@@ -374,8 +394,8 @@ function showDiagnosisResult(mbti, bigFive, isFirstTime) {
             <div style="width:4px;height:20px;border-radius:2px;background:${info.color}"></div>
             <div style="font-weight:800;font-size:16px">ビッグファイブ プロフィール</div>
           </div>
-          <div style="max-width:280px;margin:0 auto 16px">
-            ${generateRadarChart(bigFive, info.color, 280)}
+          <div style="max-width:320px;margin:0 auto 16px">
+            ${generateRadarChart(bigFive, info.color, 260)}
           </div>
           <!-- スキルバー風表示 -->
           ${Object.entries(bigFive).map(([dim, val]) => {
@@ -1114,7 +1134,7 @@ async function renderProfilePage() {
             <div style="width:4px;height:20px;border-radius:2px;background:${mbti.color}"></div>
             <div style="font-weight:800;font-size:16px">ビッグファイブ プロフィール</div>
           </div>
-          <div style="max-width:260px;margin:0 auto 20px">
+          <div style="max-width:320px;margin:0 auto 20px">
             ${generateRadarChart(b5, mbti.color, 260)}
           </div>
           ${Object.entries(b5).map(([dim, val]) => {
