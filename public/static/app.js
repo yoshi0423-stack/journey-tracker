@@ -18,6 +18,78 @@ const S = {
   personalization: null,
 };
 
+// ─── Big Five レーダーチャート SVG生成 ───
+function generateRadarChart(bigFive, color, size = 200) {
+  const labels = [
+    { key: 'O', label: '開放性' },
+    { key: 'C', label: '誠実性' },
+    { key: 'E', label: '外向性' },
+    { key: 'A', label: '協調性' },
+    { key: 'N', label: '神経症的傾向' }
+  ];
+  const cx = size / 2, cy = size / 2;
+  const maxR = size * 0.36;
+  const levels = 4;
+  const angleOff = -Math.PI / 2;
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">`;
+  svg += `<defs><filter id="rc-glow"><feGaussianBlur stdDeviation="3" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+
+  // 背景グリッド
+  for (let lv = levels; lv >= 1; lv--) {
+    const r = maxR * (lv / levels);
+    let pts = [];
+    for (let i = 0; i < 5; i++) {
+      const ang = angleOff + (i * 2 * Math.PI / 5);
+      pts.push(`${(cx + Math.cos(ang) * r).toFixed(1)},${(cy + Math.sin(ang) * r).toFixed(1)}`);
+    }
+    svg += `<polygon points="${pts.join(' ')}" fill="none" stroke="${lv === levels ? '#e2e8f0' : '#f1f5f9'}" stroke-width="${lv === levels ? 1.5 : 0.8}"/>`;
+  }
+
+  // 軸線
+  for (let i = 0; i < 5; i++) {
+    const ang = angleOff + (i * 2 * Math.PI / 5);
+    const ex = cx + Math.cos(ang) * maxR;
+    const ey = cy + Math.sin(ang) * maxR;
+    svg += `<line x1="${cx}" y1="${cy}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#e2e8f0" stroke-width="0.6"/>`;
+  }
+
+  // データ多角形
+  let dataPts = [];
+  for (let i = 0; i < 5; i++) {
+    const ang = angleOff + (i * 2 * Math.PI / 5);
+    const val = (bigFive[labels[i].key] || 4) / 7;
+    const r = maxR * val;
+    dataPts.push(`${(cx + Math.cos(ang) * r).toFixed(1)},${(cy + Math.sin(ang) * r).toFixed(1)}`);
+  }
+  svg += `<polygon points="${dataPts.join(' ')}" fill="${color}" fill-opacity="0.15" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" filter="url(#rc-glow)"/>`;
+
+  // データ点
+  for (let i = 0; i < 5; i++) {
+    const ang = angleOff + (i * 2 * Math.PI / 5);
+    const val = (bigFive[labels[i].key] || 4) / 7;
+    const r = maxR * val;
+    const px = cx + Math.cos(ang) * r;
+    const py = cy + Math.sin(ang) * r;
+    svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+  }
+
+  // ラベル
+  const labelR = maxR + size * 0.12;
+  for (let i = 0; i < 5; i++) {
+    const ang = angleOff + (i * 2 * Math.PI / 5);
+    const lx = cx + Math.cos(ang) * labelR;
+    const ly = cy + Math.sin(ang) * labelR;
+    const val = (bigFive[labels[i].key] || 4).toFixed(1);
+    const anchor = Math.abs(Math.cos(ang)) < 0.1 ? 'middle' : (Math.cos(ang) > 0 ? 'start' : 'end');
+    svg += `<text x="${lx.toFixed(1)}" y="${(ly - 6).toFixed(1)}" text-anchor="${anchor}" font-size="${size * 0.055}" font-weight="700" fill="#374151">${labels[i].label}</text>`;
+    svg += `<text x="${lx.toFixed(1)}" y="${(ly + 8).toFixed(1)}" text-anchor="${anchor}" font-size="${size * 0.05}" font-weight="600" fill="${color}">${val}</text>`;
+  }
+
+  svg += `</svg>`;
+  return svg;
+}
+
 // ─── Auth expired callback ───
 window.__onAuthExpired = () => {
   showToast('セッションが切れました。再ログインしてください');
@@ -252,54 +324,96 @@ function showDiagnosisResult(mbti, bigFive, isFirstTime) {
   const animalInfo = Personality.MBTI_ANIMALS ? Personality.MBTI_ANIMALS[mbti] : null;
   const app = document.getElementById('app');
   const b5Labels = { E: '外向性', A: '協調性', C: '誠実性', N: '神経症的傾向', O: '開放性' };
+  const b5Descs = {
+    O: '新しい体験への好奇心',
+    C: '計画を実行する力',
+    E: '人との交流エネルギー',
+    A: '他者への思いやり',
+    N: '感情の敏感さ'
+  };
+  const animalName = animalInfo ? animalInfo.name : '';
+  const typeName = info.label;
 
   app.innerHTML = `
-    <div class="onboarding" style="padding:0 20px 100px">
-      <div style="text-align:center;padding:40px 0 24px">
-        <div style="width:160px;height:160px;margin:0 auto 12px">
-          ${Personality.generateAvatar(mbti, bigFive, 160)}
+    <div class="onboarding" style="padding:0;overflow-y:auto;height:100vh">
+      <!-- ヒーローセクション: グラデーション背景 + アバター -->
+      <div style="background:linear-gradient(135deg,${info.gradientFrom},${info.gradientTo});padding:48px 20px 36px;text-align:center;position:relative;overflow:hidden">
+        <!-- 装飾パーティクル -->
+        <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+          <div style="position:absolute;top:15%;left:12%;width:6px;height:6px;background:rgba(255,255,255,.3);border-radius:50%;animation:avatarFloat 3s ease-in-out infinite"></div>
+          <div style="position:absolute;top:25%;right:18%;width:8px;height:8px;background:rgba(255,255,255,.2);border-radius:50%;animation:avatarFloat 4s ease-in-out infinite .5s"></div>
+          <div style="position:absolute;bottom:20%;left:20%;width:5px;height:5px;background:rgba(255,255,255,.25);border-radius:50%;animation:avatarFloat 3.5s ease-in-out infinite 1s"></div>
+          <div style="position:absolute;top:35%;right:8%;width:4px;height:4px;background:rgba(255,255,255,.35);border-radius:50%;animation:avatarFloat 2.8s ease-in-out infinite .3s"></div>
         </div>
-        ${animalInfo ? `<div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px">あなたの性格動物は</div>
-        <div style="font-size:28px;font-weight:900;margin-bottom:2px">${animalInfo.name}</div>
-        <div style="font-size:15px;font-weight:700;color:${info.color};margin-bottom:4px">${info.label}（${mbti}）</div>` : `<div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px">あなたは</div>
-        <div style="font-size:32px;font-weight:900;margin-bottom:4px">${info.label}</div>
-        <div style="font-size:18px;font-weight:700;color:${info.color};margin-bottom:12px">${mbti}</div>`}
-        <div style="font-size:14px;color:var(--muted);line-height:1.6;max-width:300px;margin:0 auto">${info.desc}</div>
+
+        <div style="font-size:13px;color:rgba(255,255,255,.8);font-weight:600;margin-bottom:12px;letter-spacing:1px">あなたの診断結果</div>
+
+        <div style="width:180px;height:180px;margin:0 auto 16px;filter:drop-shadow(0 8px 24px rgba(0,0,0,.25));animation:avatarFloat 3s ease-in-out infinite">
+          ${Personality.generateAvatar(mbti, bigFive, 180)}
+        </div>
+
+        ${animalInfo ? `<div style="font-size:32px;font-weight:900;color:#fff;margin-bottom:4px;text-shadow:0 2px 8px rgba(0,0,0,.2)">${animalName}</div>` : ''}
+        <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:8px">${typeName}（${mbti}）</div>
+        <div style="display:inline-block;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);border-radius:20px;padding:6px 16px;font-size:12px;color:#fff;font-weight:600">
+          ${info.emoji} ${info.habitStyle === 'strategic' ? '戦略型' : info.habitStyle === 'experimental' ? '実験型' : info.habitStyle === 'conquest' ? '征服型' : info.habitStyle === 'gamified' ? 'ゲーム型' : info.habitStyle === 'meaningful' ? '意味探求型' : info.habitStyle === 'emotional' ? '感情型' : info.habitStyle === 'narrative' ? '物語型' : info.habitStyle === 'exploratory' ? '探索型' : info.habitStyle === 'systematic' ? '体系型' : info.habitStyle === 'nurturing' ? '育成型' : info.habitStyle === 'disciplined' ? '規律型' : info.habitStyle === 'social' ? '社交型' : info.habitStyle === 'independent' ? '独立型' : info.habitStyle === 'creative' ? '創造型' : info.habitStyle === 'challenge' ? '挑戦型' : info.habitStyle === 'playful' ? '遊戯型' : '個性型'}の習慣スタイル
+        </div>
       </div>
 
-      <div class="card fade-in">
-        <div style="font-weight:700;font-size:14px;margin-bottom:12px">ビッグファイブ プロフィール</div>
-        ${Object.entries(bigFive).map(([dim, val]) => `
-          <div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
-              <span style="font-weight:600">${b5Labels[dim]}</span>
-              <span style="color:var(--muted)">${val.toFixed(1)} / 7</span>
-            </div>
-            <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden">
-              <div style="background:${info.color};height:100%;width:${(val / 7) * 100}%;border-radius:6px;transition:width .6s"></div>
-            </div>
+      <div style="padding:0 16px 120px;margin-top:-16px">
+        <!-- 性格説明カード -->
+        <div class="card fade-in" style="border-radius:20px;padding:24px;position:relative;z-index:1;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+          <div style="font-size:14px;color:var(--muted);line-height:1.7">${info.desc}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+            ${info.strengths.map(s => `<span style="background:${info.color}12;color:${info.color};padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;border:1px solid ${info.color}20">${s}</span>`).join('')}
           </div>
-        `).join('')}
-      </div>
-
-      <div class="card fade-in">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px">あなたの強み</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${info.strengths.map(s => `<span style="background:${info.color}15;color:${info.color};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600">${s}</span>`).join('')}
         </div>
-      </div>
 
-      <div class="card fade-in">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px">習慣化の注意点</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${info.riskFactors.map(r => `<span style="background:#fef2f2;color:var(--danger);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600">${r}</span>`).join('')}
+        <!-- Big Five レーダーチャート -->
+        <div class="card fade-in" style="border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <div style="width:4px;height:20px;border-radius:2px;background:${info.color}"></div>
+            <div style="font-weight:800;font-size:16px">ビッグファイブ プロフィール</div>
+          </div>
+          <div style="max-width:280px;margin:0 auto 16px">
+            ${generateRadarChart(bigFive, info.color, 280)}
+          </div>
+          <!-- スキルバー風表示 -->
+          ${Object.entries(bigFive).map(([dim, val]) => {
+            const pct = (val / 7 * 100).toFixed(0);
+            const lv = val >= 6 ? 'S' : val >= 5 ? 'A' : val >= 4 ? 'B' : val >= 3 ? 'C' : 'D';
+            return `
+            <div style="margin-bottom:14px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:${info.color}15;color:${info.color};font-size:11px;font-weight:800">${lv}</span>
+                  <span style="font-weight:700;font-size:13px">${b5Labels[dim]}</span>
+                </div>
+                <span style="font-size:12px;font-weight:600;color:${info.color}">${val.toFixed(1)}</span>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;height:10px;overflow:hidden;position:relative">
+                <div style="background:linear-gradient(90deg,${info.gradientFrom},${info.gradientTo});height:100%;width:${pct}%;border-radius:8px;transition:width .8s cubic-bezier(.4,0,.2,1);position:relative">
+                  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.3),transparent);border-radius:8px"></div>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px">${b5Descs[dim]}</div>
+            </div>`;
+          }).join('')}
         </div>
-      </div>
 
-      <div style="text-align:center;margin-top:24px">
-        <button class="btn-primary" style="width:100%;max-width:320px;padding:16px;font-size:16px;border-radius:16px;background:${info.color}" id="ob-start">
-          ${isFirstTime ? 'この設定で始める' : '閉じる'}
-        </button>
+        <!-- 注意点カード -->
+        <div class="card fade-in" style="border-radius:20px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.08);border-left:4px solid var(--danger)">
+          <div style="font-weight:800;font-size:14px;margin-bottom:10px;color:var(--danger)"><i class="fas fa-triangle-exclamation" style="margin-right:6px"></i>習慣化の注意点</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${info.riskFactors.map(r => `<span style="background:#fef2f2;color:var(--danger);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700">${r}</span>`).join('')}
+          </div>
+        </div>
+
+        <!-- CTAボタン -->
+        <div style="text-align:center;margin-top:28px">
+          <button class="btn-primary" style="width:100%;max-width:340px;padding:18px;font-size:17px;border-radius:20px;background:linear-gradient(135deg,${info.gradientFrom},${info.gradientTo});box-shadow:0 6px 24px ${info.color}40;font-weight:800" id="ob-start">
+            ${isFirstTime ? '✨ この設定で始める' : '閉じる'}
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -403,18 +517,26 @@ async function renderRecordPage() {
 
   page.innerHTML = `
     <div style="padding:16px 16px 0">
-      ${mbti ? `<div class="card" style="text-align:center;padding:28px 20px;background:linear-gradient(135deg,${p.theme.gradientFrom}08,${p.theme.gradientTo}12)">
-        <div class="home-avatar-wrapper" style="margin:0 auto 12px;width:80px;height:80px;filter:drop-shadow(0 4px 12px ${mbti.color}40)">
-          ${Personality.generateAvatar(profile.mbti, b5 || {E:4,A:4,C:4,N:4,O:4}, 80)}
+      ${mbti ? `<div class="card" style="text-align:center;padding:0;overflow:hidden;border-radius:20px;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+        <div style="background:linear-gradient(135deg,${p.theme.gradientFrom},${p.theme.gradientTo});padding:24px 20px 20px;position:relative;overflow:hidden">
+          <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+            <div style="position:absolute;top:10%;right:10%;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
+            <div style="position:absolute;bottom:10%;left:8%;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.04)"></div>
+          </div>
+          <div class="home-avatar-wrapper" style="margin:0 auto 8px;width:80px;height:80px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))">
+            ${Personality.generateAvatar(profile.mbti, b5 || {E:4,A:4,C:4,N:4,O:4}, 80)}
+          </div>
+          <div style="font-size:13px;color:rgba(255,255,255,.8);font-weight:600;margin-bottom:2px">${(Personality.MBTI_ANIMALS && Personality.MBTI_ANIMALS[profile.mbti]) ? Personality.MBTI_ANIMALS[profile.mbti].name + ' · ' : ''}${mbti.emoji} ${mbti.label}</div>
         </div>
-        <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:2px">${(Personality.MBTI_ANIMALS && Personality.MBTI_ANIMALS[profile.mbti]) ? Personality.MBTI_ANIMALS[profile.mbti].name + ' · ' : ''}${mbti.emoji} ${mbti.label}</div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text)">${homeMsg.greeting}</div>
-        <div style="font-size:48px;font-weight:900" class="text-gradient">${distKm}<span style="font-size:18px;opacity:.6"> km</span></div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">${acts}回の記録 · ${days}日間の積み重ね</div>
-        ${homeMsg.sub ? `<div style="margin-top:6px;font-size:11px;color:var(--muted)">${homeMsg.sub}</div>` : ''}
-        <div style="margin-top:8px;display:flex;justify-content:center;gap:8px">
-          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--success);background:#f0fdf4;padding:3px 10px;border-radius:20px"><i class="fas fa-cloud-arrow-up" style="font-size:9px"></i>クラウド保存</span>
-          <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:${p.theme.primary};background:${p.theme.primary}10;padding:3px 10px;border-radius:20px"><i class="fas fa-star" style="font-size:9px"></i>Lv.${lvl.level} ${lvl.title}</span>
+        <div style="padding:16px 20px 20px">
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text)">${homeMsg.greeting}</div>
+          <div style="font-size:48px;font-weight:900" class="text-gradient">${distKm}<span style="font-size:18px;opacity:.6"> km</span></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">${acts}回の記録 · ${days}日間の積み重ね</div>
+          ${homeMsg.sub ? `<div style="margin-top:6px;font-size:11px;color:var(--muted)">${homeMsg.sub}</div>` : ''}
+          <div style="margin-top:10px;display:flex;justify-content:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--success);background:#f0fdf4;padding:4px 12px;border-radius:20px;font-weight:600"><i class="fas fa-cloud-arrow-up" style="font-size:9px"></i>クラウド保存</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:${p.theme.primary};background:${p.theme.primary}10;padding:4px 12px;border-radius:20px;font-weight:600"><i class="fas fa-star" style="font-size:9px"></i>Lv.${lvl.level} ${lvl.title}</span>
+          </div>
         </div>
       </div>` : `<div class="card" style="text-align:center;padding:28px 20px">
         <div style="font-size:48px;font-weight:900" class="text-gradient">${distKm}<span style="font-size:18px;opacity:.6"> km</span></div>
@@ -922,111 +1044,152 @@ async function renderProfilePage() {
   const b5Labels = { E: '外向性', A: '協調性', C: '誠実性', N: '神経症的傾向', O: '開放性' };
   const animalInfo = Personality.MBTI_ANIMALS ? Personality.MBTI_ANIMALS[profile.mbti] : null;
   const lvl = p.levelInfo;
+  const userName = user ? esc(user.display_name || user.email.split('@')[0]) : 'あなた';
+  const animalName = animalInfo ? animalInfo.name : '';
+  const manual = Personality.MBTI_MANUALS ? Personality.MBTI_MANUALS[profile.mbti] : null;
 
   page.innerHTML = `
-    <div style="padding:16px">
-      <div style="font-weight:800;font-size:18px;margin-bottom:16px"><i class="fas fa-user-gear" style="color:var(--primary);margin-right:6px"></i>自分</div>
-
-      <!-- アカウント情報 -->
-      <div class="card fade-in" style="display:flex;align-items:center;gap:12px">
-        <div style="width:56px;height:56px;flex-shrink:0">
-          ${Personality.generateAvatar(profile.mbti, b5, 56)}
+    <div style="padding:0 0 16px">
+      <!-- 取扱説明書風ヒーロー -->
+      <div style="background:linear-gradient(135deg,${mbti.gradientFrom},${mbti.gradientTo});padding:32px 20px 40px;position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+          <div style="position:absolute;top:10%;left:8%;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
+          <div style="position:absolute;bottom:15%;right:10%;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.04)"></div>
+          <div style="position:absolute;top:40%;right:5%;width:4px;height:4px;background:rgba(255,255,255,.3);border-radius:50%;animation:avatarFloat 3s ease-in-out infinite"></div>
+          <div style="position:absolute;top:20%;left:15%;width:5px;height:5px;background:rgba(255,255,255,.25);border-radius:50%;animation:avatarFloat 4s ease-in-out infinite .5s"></div>
         </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:15px">${user ? esc(user.display_name || user.email) : ''}</div>
-          <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis">${user ? esc(user.email) : ''}</div>
-        </div>
-        <span style="font-size:11px;color:var(--success);background:#f0fdf4;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap"><i class="fas fa-cloud-arrow-up" style="font-size:9px;margin-right:3px"></i>同期済み</span>
-      </div>
-
-      <!-- 性格カード -->
-      <div class="card fade-in" style="text-align:center;padding:24px;background:linear-gradient(135deg,${mbti.gradientFrom}08,${mbti.gradientTo}12)">
-        <div style="width:140px;height:140px;margin:0 auto 8px">
-          ${Personality.generateAvatar(profile.mbti, b5, 140)}
-        </div>
-        ${animalInfo ? `<div style="font-size:22px;font-weight:900">${animalInfo.name}</div>
-        <div style="font-size:14px;font-weight:700;color:${mbti.color};margin-bottom:4px">${mbti.label}（${profile.mbti}）</div>` : `<div style="font-size:24px;font-weight:900">${mbti.label}</div>
-        <div style="font-size:16px;font-weight:700;color:${mbti.color};margin-bottom:8px">${profile.mbti}</div>`}
-        <div style="font-size:13px;color:var(--muted);line-height:1.5">${mbti.desc}</div>
-      </div>
-
-      <!-- レベル -->
-      <div class="card fade-in">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div style="font-weight:700;font-size:15px"><i class="fas fa-star" style="color:var(--accent);margin-right:6px"></i>レベル</div>
-          <div style="font-size:13px;color:var(--muted)">${stats.total_activities}回の記録</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-          <div style="font-size:32px;font-weight:900;color:var(--primary)">Lv.${lvl.level}</div>
-          <div>
-            <div style="font-size:15px;font-weight:700">${lvl.title}</div>
-            <div style="font-size:12px;color:var(--muted)">${lvl.unlocks}</div>
+        <div style="text-align:center;position:relative;z-index:1">
+          <div style="font-size:12px;color:rgba(255,255,255,.7);font-weight:600;margin-bottom:4px;letter-spacing:2px">PERSONAL MANUAL</div>
+          <div style="font-size:20px;font-weight:900;color:#fff;margin-bottom:16px">${userName}の取扱説明書</div>
+          <div style="width:140px;height:140px;margin:0 auto 12px;filter:drop-shadow(0 8px 24px rgba(0,0,0,.3));animation:avatarFloat 3s ease-in-out infinite">
+            ${Personality.generateAvatar(profile.mbti, b5, 140)}
+          </div>
+          ${animalInfo ? `<div style="font-size:24px;font-weight:900;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.2)">${animalName}</div>` : ''}
+          <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.85)">${mbti.label}（${profile.mbti}）</div>
+          <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#fff;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);padding:4px 12px;border-radius:20px;font-weight:600"><i class="fas fa-star" style="font-size:9px"></i>Lv.${lvl.level} ${lvl.title}</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#fff;background:rgba(255,255,255,.2);backdrop-filter:blur(8px);padding:4px 12px;border-radius:20px;font-weight:600"><i class="fas fa-cloud-arrow-up" style="font-size:9px"></i>同期済み</span>
           </div>
         </div>
-        ${lvl.nextLevel ? `
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
-            <span>Lv.${lvl.level}</span><span>Lv.${lvl.nextLevel} (${lvl.nextMin}回)</span>
-          </div>
-          <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden">
-            <div style="background:linear-gradient(90deg,${mbti.gradientFrom},${mbti.gradientTo});height:100%;width:${lvl.progress}%;border-radius:6px;transition:width .6s"></div>
-          </div>
-        ` : '<div style="font-size:13px;color:var(--accent);font-weight:600">最高レベル到達！</div>'}
       </div>
 
-      <!-- Big Five -->
-      <div class="card fade-in">
-        <div style="font-weight:700;font-size:15px;margin-bottom:12px">ビッグファイブ プロフィール</div>
-        ${Object.entries(b5).map(([dim, val]) => `
-          <div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
-              <span style="font-weight:600">${b5Labels[dim]}</span>
-              <span style="color:var(--muted)">${val.toFixed(1)}</span>
+      <div style="padding:0 16px;margin-top:-20px;position:relative;z-index:1">
+        <!-- 性格タイプカード -->
+        <div class="card fade-in" style="border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+          <div style="font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:16px">${mbti.desc}</div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--text)">あなたの強み</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+            ${mbti.strengths.map(s => `<span style="background:${mbti.color}12;color:${mbti.color};padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;border:1px solid ${mbti.color}20">${s}</span>`).join('')}
+          </div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--danger)">注意したいこと</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${mbti.riskFactors.map(r => `<span style="background:#fef2f2;color:var(--danger);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700">${r}</span>`).join('')}
+          </div>
+        </div>
+
+        ${manual && manual.length > 0 ? `
+        <!-- 取扱説明書 -->
+        <div class="card fade-in" style="border-radius:20px;padding:0;box-shadow:0 4px 24px rgba(0,0,0,.08);overflow:hidden">
+          <div style="background:linear-gradient(135deg,${mbti.gradientFrom}15,${mbti.gradientTo}25);padding:20px 24px 12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <div style="width:4px;height:20px;border-radius:2px;background:${mbti.color}"></div>
+              <div style="font-weight:800;font-size:16px">${userName}の取扱説明書</div>
             </div>
-            <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden">
-              <div style="background:${mbti.color};height:100%;width:${(val / 7) * 100}%;border-radius:6px"></div>
-            </div>
+            <div style="font-size:11px;color:var(--muted);padding-left:12px">${animalName ? animalName + ' · ' : ''}${mbti.label}タイプ</div>
           </div>
-        `).join('')}
-      </div>
-
-      <!-- 強みとリスク -->
-      <div class="card fade-in">
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px">あなたの強み</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-          ${mbti.strengths.map(s => `<span style="background:${mbti.color}15;color:${mbti.color};padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600">${s}</span>`).join('')}
+          <div style="padding:8px 24px 20px">
+            ${manual.map((item, i) => `
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${i < manual.length - 1 ? 'border-bottom:1px solid #f1f5f9' : ''}">
+                <span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:50%;background:${mbti.color}12;color:${mbti.color};font-size:11px;font-weight:800;margin-top:1px">${i + 1}</span>
+                <span style="font-size:13px;line-height:1.6;color:var(--text)">${item}</span>
+              </div>
+            `).join('')}
+          </div>
         </div>
-        <div style="font-weight:700;font-size:14px;margin-bottom:8px">注意したいこと</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${mbti.riskFactors.map(r => `<span style="background:#fef2f2;color:var(--danger);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600">${r}</span>`).join('')}
-        </div>
-      </div>
+        ` : ''}
 
-      <!-- 進化ログ -->
-      ${log.length > 0 ? `
-        <div class="card fade-in">
-          <div style="font-weight:700;font-size:15px;margin-bottom:12px"><i class="fas fa-timeline" style="color:var(--primary);margin-right:6px"></i>カスタマイズ進化ログ</div>
-          ${log.slice(-10).reverse().map(entry => {
-            const date = fmtDate(entry.timestamp);
-            if (entry.type === 'diagnosis') return `<div class="activity-row"><div class="activity-dot" style="background:var(--accent)"></div><div style="flex:1"><div style="font-size:13px;font-weight:600">性格診断実施</div><div style="font-size:12px;color:var(--muted)">${date} · ${entry.mbti}</div></div></div>`;
-            if (entry.type === 'level_up') return `<div class="activity-row"><div class="activity-dot" style="background:var(--success)"></div><div style="flex:1"><div style="font-size:13px;font-weight:600">Lv.${entry.level} ${entry.title} に到達</div><div style="font-size:12px;color:var(--muted)">${date} · ${entry.unlocks}解放</div></div></div>`;
-            return '';
+        <!-- Big Five レーダーチャート -->
+        <div class="card fade-in" style="border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <div style="width:4px;height:20px;border-radius:2px;background:${mbti.color}"></div>
+            <div style="font-weight:800;font-size:16px">ビッグファイブ プロフィール</div>
+          </div>
+          <div style="max-width:260px;margin:0 auto 20px">
+            ${generateRadarChart(b5, mbti.color, 260)}
+          </div>
+          ${Object.entries(b5).map(([dim, val]) => {
+            const pct = (val / 7 * 100).toFixed(0);
+            const lv = val >= 6 ? 'S' : val >= 5 ? 'A' : val >= 4 ? 'B' : val >= 3 ? 'C' : 'D';
+            return `
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:${mbti.color}15;color:${mbti.color};font-size:10px;font-weight:800">${lv}</span>
+                  <span style="font-weight:700;font-size:13px">${b5Labels[dim]}</span>
+                </div>
+                <span style="font-size:12px;font-weight:600;color:${mbti.color}">${val.toFixed(1)}</span>
+              </div>
+              <div style="background:#f1f5f9;border-radius:8px;height:8px;overflow:hidden">
+                <div style="background:linear-gradient(90deg,${mbti.gradientFrom},${mbti.gradientTo});height:100%;width:${pct}%;border-radius:8px;position:relative">
+                  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.3),transparent);border-radius:8px"></div>
+                </div>
+              </div>
+            </div>`;
           }).join('')}
         </div>
-      ` : ''}
 
-      <!-- アクション -->
-      <div class="card fade-in">
-        <div style="font-weight:700;font-size:15px;margin-bottom:12px">設定</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="data-mgmt-btn" style="width:100%;justify-content:center" id="btn-rediag">
-            <i class="fas fa-rotate"></i> 性格診断をやり直す
-          </button>
-          <button class="data-mgmt-btn danger" style="width:100%;justify-content:center" id="btn-reset-all">
-            <i class="fas fa-triangle-exclamation"></i> 全データ+プロフィールを完全削除
-          </button>
-          <button class="data-mgmt-btn" style="width:100%;justify-content:center;color:var(--muted);border-color:#e2e8f0" id="btn-logout">
-            <i class="fas fa-arrow-right-from-bracket"></i> ログアウト
-          </button>
+        <!-- レベル -->
+        <div class="card fade-in" style="border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-weight:800;font-size:15px"><i class="fas fa-star" style="color:var(--accent);margin-right:6px"></i>レベル</div>
+            <div style="font-size:13px;color:var(--muted)">${stats.total_activities}回の記録</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+            <div style="font-size:32px;font-weight:900;color:var(--primary)">Lv.${lvl.level}</div>
+            <div>
+              <div style="font-size:15px;font-weight:700">${lvl.title}</div>
+              <div style="font-size:12px;color:var(--muted)">${lvl.unlocks}</div>
+            </div>
+          </div>
+          ${lvl.nextLevel ? `
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+              <span>Lv.${lvl.level}</span><span>Lv.${lvl.nextLevel} (${lvl.nextMin}回)</span>
+            </div>
+            <div style="background:#f1f5f9;border-radius:8px;height:10px;overflow:hidden">
+              <div style="background:linear-gradient(90deg,${mbti.gradientFrom},${mbti.gradientTo});height:100%;width:${lvl.progress}%;border-radius:8px;position:relative">
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.3),transparent);border-radius:8px"></div>
+              </div>
+            </div>
+          ` : '<div style="font-size:13px;color:var(--accent);font-weight:600">🎉 最高レベル到達！</div>'}
+        </div>
+
+        <!-- 進化ログ -->
+        ${log.length > 0 ? `
+          <div class="card fade-in" style="border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+            <div style="font-weight:800;font-size:15px;margin-bottom:12px"><i class="fas fa-timeline" style="color:var(--primary);margin-right:6px"></i>カスタマイズ進化ログ</div>
+            ${log.slice(-10).reverse().map(entry => {
+              const date = fmtDate(entry.timestamp);
+              if (entry.type === 'diagnosis') return `<div class="activity-row"><div class="activity-dot" style="background:var(--accent)"></div><div style="flex:1"><div style="font-size:13px;font-weight:600">性格診断実施</div><div style="font-size:12px;color:var(--muted)">${date} · ${entry.mbti}</div></div></div>`;
+              if (entry.type === 'level_up') return `<div class="activity-row"><div class="activity-dot" style="background:var(--success)"></div><div style="flex:1"><div style="font-size:13px;font-weight:600">Lv.${entry.level} ${entry.title} に到達</div><div style="font-size:12px;color:var(--muted)">${date} · ${entry.unlocks}解放</div></div></div>`;
+              return '';
+            }).join('')}
+          </div>
+        ` : ''}
+
+        <!-- アクション -->
+        <div class="card fade-in" style="border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+          <div style="font-weight:800;font-size:15px;margin-bottom:12px">設定</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="data-mgmt-btn" style="width:100%;justify-content:center;border-radius:12px;padding:12px" id="btn-rediag">
+              <i class="fas fa-rotate"></i> 性格診断をやり直す
+            </button>
+            <button class="data-mgmt-btn danger" style="width:100%;justify-content:center;border-radius:12px;padding:12px" id="btn-reset-all">
+              <i class="fas fa-triangle-exclamation"></i> 全データ+プロフィールを完全削除
+            </button>
+            <button class="data-mgmt-btn" style="width:100%;justify-content:center;color:var(--muted);border-color:#e2e8f0;border-radius:12px;padding:12px" id="btn-logout">
+              <i class="fas fa-arrow-right-from-bracket"></i> ログアウト
+            </button>
+          </div>
         </div>
       </div>
     </div>
