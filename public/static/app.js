@@ -16,6 +16,11 @@ const S = {
   seenMilestones: JSON.parse(localStorage.getItem('seenMs') || '[]'),
   profile: null,
   personalization: null,
+  // Background tracking state
+  wakeLock: null,
+  lastPosTime: null,
+  lastAccuracy: null,
+  bgNotified: false,
 };
 
 // ─── Big Five レーダーチャート SVG生成 ───
@@ -710,53 +715,186 @@ function showConfirmModal({ title, message, warning, confirmLabel, cancelLabel, 
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 2. Tracking
+// 2. Tracking (Background-aware)
 // ═══════════════════════════════════════════════════════════════
-function startTracking() {
+
+// ─── Wake Lock: 画面スリープ防止 ───
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      S.wakeLock = await navigator.wakeLock.request('screen');
+      S.wakeLock.addEventListener('release', () => { S.wakeLock = null; });
+      console.log('[Tracking] Wake Lock acquired');
+    }
+  } catch (e) { console.warn('[Tracking] Wake Lock failed:', e.message); }
+}
+function releaseWakeLock() {
+  if (S.wakeLock) { S.wakeLock.release(); S.wakeLock = null; }
+}
+
+// ─── バックグラウンド復帰時に Wake Lock 再取得 & watchPosition 再登録 ───
+document.addEventListener('visibilitychange', () => {
+  if (!S.tracking) return;
+  if (document.visibilityState === 'visible') {
+    // フォアグラウンド復帰
+    requestWakeLock();
+    // watchPosition を再登録して正確な位置を即座に取得
+    restartWatch();
+    console.log('[Tracking] Returned to foreground, watch restarted');
+  }
+});
+
+function restartWatch() {
+  if (S.watchId !== null) navigator.geolocation.clearWatch(S.watchId);
+  S.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
+    enableHighAccuracy: true,
+    maximumAge: 3000,   // バックグラウンドではキャッシュ許容
+    timeout: 30000      // タイムアウト延長
+  });
+}
+
+// ─── バックグラウンド通知 ───
+async function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+function showBgNotification() {
+  if (S.bgNotified) return;
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Journey Tracker', {
+      body: '📍 記録中です。アプリに戻ると正確な位置が取得されます。',
+      icon: '/static/icon-192.png',
+      tag: 'tracking-active',
+      silent: true
+    });
+    S.bgNotified = true;
+  }
+}
+
+// ─── メインのトラッキング関数 ───
+async function startTracking() {
   if (!navigator.geolocation) { alert('位置情報が利用できません'); return; }
   S.tracking = true; S.paused = false; S.points = []; S.distance = 0;
   S.startTime = Date.now(); S.pausedTime = 0; S.lastPos = null;
-  S.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  S.lastPosTime = null; S.lastAccuracy = null; S.bgNotified = false;
+
+  // Wake Lock 取得
+  await requestWakeLock();
+  // 通知許可
+  await requestNotificationPermission();
+
+  // 高精度 watchPosition
+  S.watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
+    enableHighAccuracy: true,
+    maximumAge: 3000,
+    timeout: 30000
+  });
   S.timerInterval = setInterval(updateTrackingUI, 1000);
   showTrackingPanel();
 }
+
+// ─── 位置情報コールバック（精度フィルタ強化版）───
 function onPos(pos) {
   if (S.paused || !S.tracking) return;
-  const { latitude: lat, longitude: lng, accuracy } = pos.coords;
-  if (accuracy > 50) return;
+  const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
+  const now = Date.now();
+
+  // 1) 精度フィルタ: 精度が悪すぎる点を除外（動的閾値）
+  const accThreshold = document.visibilityState === 'visible' ? 30 : 80;
+  if (accuracy > accThreshold) {
+    console.log(`[Tracking] Skipped: accuracy ${accuracy.toFixed(0)}m > ${accThreshold}m`);
+    return;
+  }
+
   const elapsed = getElapsed();
+
   if (S.lastPos) {
     const d = haversine(S.lastPos[0], S.lastPos[1], lat, lng);
-    const dt = elapsed - (S.points.length > 0 ? S.points[S.points.length - 1][2] : 0);
-    if (d < 10 && dt < 5) return;
-    S.distance += d;
+    const dt = (now - S.lastPosTime) / 1000; // 実経過秒
+
+    // 2) 速度フィルタ: 人間の最大移動速度チェック
+    //    歩行: ~6km/h, ランニング: ~15km/h, 自転車: ~40km/h
+    //    50km/h (≈13.9m/s) を超える移動は GPS ジャンプとみなす
+    if (dt > 0) {
+      const speedCalc = d / dt; // m/s
+      const maxSpeed = 13.9; // 50 km/h in m/s
+      if (speedCalc > maxSpeed) {
+        console.log(`[Tracking] GPS jump filtered: ${(speedCalc * 3.6).toFixed(1)}km/h, ${d.toFixed(0)}m in ${dt.toFixed(0)}s`);
+        return;
+      }
+    }
+
+    // 3) 最小距離・時間フィルタ（ノイズ除去）
+    const elapsedSinceLast = elapsed - (S.points.length > 0 ? S.points[S.points.length - 1][2] : 0);
+    if (d < 5 && elapsedSinceLast < 3) return; // 5m以内かつ3秒以内は無視
+
+    // 4) 精度加重: 精度が良いほど信頼する
+    //    accuracy < 10m ならそのまま、10-30m なら少し補正
+    let adjustedD = d;
+    if (accuracy > 15 && d < accuracy * 0.5) {
+      // 移動距離が精度の半分未満 → ノイズの可能性
+      adjustedD = d * 0.7;
+    }
+
+    S.distance += adjustedD;
   }
+
   S.points.push([lat, lng, elapsed]);
   S.lastPos = [lat, lng];
+  S.lastPosTime = now;
+  S.lastAccuracy = accuracy;
   updateTrackingUI();
 }
-function onPosErr(err) { console.warn('Geo error:', err.message); }
+
+function onPosErr(err) {
+  console.warn('[Tracking] Geo error:', err.code, err.message);
+  // タイムアウトの場合は watchPosition を再起動
+  if (err.code === 3 && S.tracking && !S.paused) {
+    console.log('[Tracking] Timeout, restarting watch...');
+    restartWatch();
+  }
+}
+
 function getElapsed() {
   if (!S.startTime) return 0;
   const pausing = S.paused ? (Date.now() - S.pauseStart) : 0;
   return Math.floor((Date.now() - S.startTime - S.pausedTime - pausing) / 1000);
 }
-function pauseTracking() { S.paused = true; S.pauseStart = Date.now(); updateTrackingUI(); }
-function resumeTracking() { if (S.pauseStart) S.pausedTime += Date.now() - S.pauseStart; S.paused = false; S.pauseStart = null; updateTrackingUI(); }
+function pauseTracking() {
+  S.paused = true; S.pauseStart = Date.now();
+  releaseWakeLock();
+  updateTrackingUI();
+}
+function resumeTracking() {
+  if (S.pauseStart) S.pausedTime += Date.now() - S.pauseStart;
+  S.paused = false; S.pauseStart = null;
+  requestWakeLock();
+  restartWatch(); // 再開時に watchPosition を再登録
+  updateTrackingUI();
+}
 function stopTracking() {
   S.tracking = false;
   if (S.watchId !== null) navigator.geolocation.clearWatch(S.watchId);
   if (S.timerInterval) clearInterval(S.timerInterval);
   S.watchId = null; S.timerInterval = null;
+  releaseWakeLock();
+  S.bgNotified = false;
   hideTrackingPanel(); showSaveModal();
 }
 function showTrackingPanel() {
   const panel = document.getElementById('tracking-panel');
   panel.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:10px">
       <div class="tracking-stat"><div class="val" id="tp-dist">0.00</div><div class="lbl">km</div></div>
       <div class="tracking-stat"><div class="val" id="tp-time">00:00</div><div class="lbl">時間</div></div>
       <div class="tracking-stat"><div class="val" id="tp-pts">0</div><div class="lbl">ポイント</div></div>
+    </div>
+    <div id="tp-gps-bar" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.08);margin-bottom:12px;font-size:12px">
+      <span id="tp-gps-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0"></span>
+      <span id="tp-gps-label" style="color:rgba(255,255,255,.8)">GPS取得中...</span>
+      <span style="margin-left:auto;color:rgba(255,255,255,.5)" id="tp-gps-acc">--m</span>
+      <span id="tp-wakelock" style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,.2);color:#10b981;display:none">🔒 画面維持</span>
     </div>
     <div style="display:flex;gap:10px">
       <button class="btn-ghost" style="flex:1" id="btn-pause"><i class="fas fa-pause"></i> 一時停止</button>
@@ -775,6 +913,20 @@ function updateTrackingUI() {
   t.textContent = fmtDurationShort(getElapsed());
   pts.textContent = S.points.length;
   if (pauseBtn) pauseBtn.innerHTML = S.paused ? '<i class="fas fa-play"></i> 再開' : '<i class="fas fa-pause"></i> 一時停止';
+
+  // GPS精度インジケーター更新
+  const dot = document.getElementById('tp-gps-dot');
+  const label = document.getElementById('tp-gps-label');
+  const acc = document.getElementById('tp-gps-acc');
+  const wl = document.getElementById('tp-wakelock');
+  if (dot && S.lastAccuracy !== null) {
+    const a = S.lastAccuracy;
+    if (a <= 10) { dot.style.background = '#10b981'; label.textContent = 'GPS: 高精度'; }
+    else if (a <= 30) { dot.style.background = '#f59e0b'; label.textContent = 'GPS: 中精度'; }
+    else { dot.style.background = '#ef4444'; label.textContent = 'GPS: 低精度'; }
+    acc.textContent = `±${Math.round(a)}m`;
+  }
+  if (wl) wl.style.display = S.wakeLock ? 'inline' : 'none';
 }
 function hideTrackingPanel() { document.getElementById('tracking-panel').classList.remove('open'); }
 
@@ -1329,3 +1481,12 @@ function showToast(msg, duration = 3000) {
 
 // ─── SW ───
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+
+// ─── ページ離脱警告（記録中のみ）───
+window.addEventListener('beforeunload', (e) => {
+  if (S.tracking) {
+    e.preventDefault();
+    e.returnValue = '記録中です。ページを離れると記録が失われます。';
+    return e.returnValue;
+  }
+});
