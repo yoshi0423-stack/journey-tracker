@@ -255,7 +255,9 @@ function showDiagnosisResult(mbti, bigFive, isFirstTime) {
   app.innerHTML = `
     <div class="onboarding" style="padding:0 20px 100px">
       <div style="text-align:center;padding:40px 0 24px">
-        <div style="font-size:56px;margin-bottom:8px">${info.emoji}</div>
+        <div style="width:160px;height:160px;margin:0 auto 12px">
+          ${Personality.generateAvatar(mbti, bigFive, 160)}
+        </div>
         <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px">あなたは</div>
         <div style="font-size:32px;font-weight:900;margin-bottom:4px">${info.label}</div>
         <div style="font-size:18px;font-weight:700;color:${info.color};margin-bottom:12px">${mbti}</div>
@@ -335,12 +337,31 @@ function renderShell() {
     <button class="tab-btn" data-tab="map"><i class="fas fa-map"></i><span>地図</span></button>
     <button class="tab-btn" data-tab="review"><i class="fas fa-calendar-days"></i><span>振返り</span></button>
     <button class="tab-btn" data-tab="compare"><i class="fas fa-code-compare"></i><span>比較</span><span class="tab-badge" id="compare-badge"></span></button>
-    <button class="tab-btn" data-tab="profile"><i class="fas fa-user-gear"></i><span>自分</span></button>
+    <button class="tab-btn" data-tab="profile"><span class="tab-avatar" id="tab-avatar-slot"></span><i class="fas fa-user-gear tab-profile-icon"></i><span>自分</span></button>
   `;
   document.body.appendChild(bar);
   bar.querySelectorAll('.tab-btn').forEach(b => {
     b.addEventListener('click', () => switchTab(b.dataset.tab));
   });
+
+  // タブバーにミニアバターを表示
+  updateTabAvatar();
+}
+
+function updateTabAvatar() {
+  const slot = document.getElementById('tab-avatar-slot');
+  if (!slot) return;
+  if (S.profile && S.profile.mbti) {
+    slot.innerHTML = Personality.generateAvatar(S.profile.mbti, S.profile.bigFive, 26);
+    slot.style.display = 'block';
+    // font-awesomeアイコンを隠す
+    const icon = slot.parentElement.querySelector('.tab-profile-icon');
+    if (icon) icon.style.display = 'none';
+  } else {
+    slot.style.display = 'none';
+    const icon = slot.parentElement.querySelector('.tab-profile-icon');
+    if (icon) icon.style.display = '';
+  }
 }
 
 function switchTab(tab) {
@@ -374,10 +395,15 @@ async function renderRecordPage() {
   const mbti = p.mbtiInfo;
   const homeMsg = p.homeMessages;
   const user = DB.getUser();
+  const profile = S.profile;
+  const b5 = profile ? profile.bigFive : null;
 
   page.innerHTML = `
     <div style="padding:16px 16px 0">
       ${mbti ? `<div class="card" style="text-align:center;padding:28px 20px;background:linear-gradient(135deg,${p.theme.gradientFrom}08,${p.theme.gradientTo}12)">
+        <div class="home-avatar-wrapper" style="margin:0 auto 12px;width:80px;height:80px;filter:drop-shadow(0 4px 12px ${mbti.color}40)">
+          ${Personality.generateAvatar(profile.mbti, b5 || {E:4,A:4,C:4,N:4,O:4}, 80)}
+        </div>
         <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:2px">${mbti.emoji} ${mbti.label}</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text)">${homeMsg.greeting}</div>
         <div style="font-size:48px;font-weight:900" class="text-gradient">${distKm}<span style="font-size:18px;opacity:.6"> km</span></div>
@@ -618,6 +644,7 @@ function showSaveModal() {
   modal.innerHTML = `
     <div class="save-sheet">
       <div style="text-align:center;margin-bottom:20px">
+        ${S.profile && S.profile.mbti ? `<div class="save-avatar" style="margin:0 auto 12px;width:64px;height:64px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.15))">${Personality.generateAvatarSmall(S.profile.mbti, S.profile.bigFive)}</div>` : ''}
         <div style="font-size:14px;color:var(--muted);font-weight:600">記録完了</div>
         <div style="font-size:42px;font-weight:900" class="text-gradient">${distKm} km</div>
         <div style="font-size:14px;color:var(--muted)">${fmtDuration(elapsed)}</div>
@@ -898,8 +925,8 @@ async function renderProfilePage() {
 
       <!-- アカウント情報 -->
       <div class="card fade-in" style="display:flex;align-items:center;gap:12px">
-        <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${mbti.gradientFrom},${mbti.gradientTo});display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0">
-          ${user && user.display_name ? esc(user.display_name.slice(0, 1)) : '<i class="fas fa-user"></i>'}
+        <div style="width:56px;height:56px;flex-shrink:0">
+          ${Personality.generateAvatar(profile.mbti, b5, 56)}
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:15px">${user ? esc(user.display_name || user.email) : ''}</div>
@@ -910,7 +937,9 @@ async function renderProfilePage() {
 
       <!-- 性格カード -->
       <div class="card fade-in" style="text-align:center;padding:24px;background:linear-gradient(135deg,${mbti.gradientFrom}08,${mbti.gradientTo}12)">
-        <div style="font-size:48px;margin-bottom:4px">${mbti.emoji}</div>
+        <div style="width:140px;height:140px;margin:0 auto 8px">
+          ${Personality.generateAvatar(profile.mbti, b5, 140)}
+        </div>
         <div style="font-size:24px;font-weight:900">${mbti.label}</div>
         <div style="font-size:16px;font-weight:700;color:${mbti.color};margin-bottom:8px">${profile.mbti}</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.5">${mbti.desc}</div>
@@ -1058,7 +1087,7 @@ async function showMilestoneOverlay(msType) {
   overlay.innerHTML = `
     <div class="ms-card">
       <div class="ms-achieved">
-        <div style="font-size:48px;margin-bottom:8px"><i class="fas fa-trophy"></i></div>
+        ${S.profile && S.profile.mbti ? `<div style="margin:0 auto 12px;width:80px;height:80px;filter:drop-shadow(0 4px 16px rgba(255,255,255,.3))">${Personality.generateAvatar(S.profile.mbti, S.profile.bigFive, 80)}</div>` : `<div style="font-size:48px;margin-bottom:8px"><i class="fas fa-trophy"></i></div>`}
         <div style="font-size:14px;opacity:.7;margin-bottom:4px">MILESTONE REACHED</div>
         <div style="font-size:48px;font-weight:900;margin-bottom:8px">${km} km</div>
         <div style="font-size:16px;opacity:.9;margin-bottom:4px">累計 ${totalKm} km · ${durH}時間+</div>

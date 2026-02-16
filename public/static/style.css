@@ -300,6 +300,35 @@ body { display: flex; flex-direction: column; }
   background: var(--primary); margin-right: 4px; vertical-align: middle;
 }
 
+/* ---------- Avatar integration ---------- */
+.home-avatar-wrapper {
+  animation: avatarFloat 3s ease-in-out infinite;
+}
+.home-avatar-wrapper svg {
+  width: 100%; height: 100%;
+}
+@keyframes avatarFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Tab bar avatar */
+.tab-avatar {
+  display: none; width: 26px; height: 26px;
+  border-radius: 50%; overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color .2s;
+}
+.tab-avatar svg { width: 100%; height: 100%; }
+.tab-btn.active .tab-avatar { border-color: var(--primary); }
+
+/* Save modal avatar */
+.save-avatar svg { width: 100%; height: 100%; }
+
+/* Profile page avatar glow */
+.card .home-avatar-wrapper svg,
+.card svg { transition: filter .3s; }
+
 /* ---------- Dynamic gradient text ---------- */
 .text-gradient {
   background: linear-gradient(90deg, var(--gradient-from, #4f46e5), var(--gradient-to, #7c3aed));

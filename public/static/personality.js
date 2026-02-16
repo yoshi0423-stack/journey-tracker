@@ -462,7 +462,243 @@ function applyTheme(personalization) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 7. Public API (window.Personality)
+// 7. アバター生成エンジン – MBTI × Big Five → SVG
+//    性格特性から唯一無二のキャラクターアバターを生成
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * MBTI + Big Five からSVGアバターを生成
+ * @param {string} mbti - MBTIコード (例: "INFP")
+ * @param {object} bigFive - { E, A, C, N, O } (各1-7)
+ * @param {number} size - SVGサイズ (default 200)
+ * @returns {string} SVG文字列
+ */
+function generateAvatar(mbti, bigFive, size = 200) {
+  const prof = MBTI_PROFILES[mbti] || MBTI_PROFILES['INFP'];
+  const b5 = bigFive || { E: 4, A: 4, C: 4, N: 4, O: 4 };
+  // 正規化 0-1
+  const E = (b5.E - 1) / 6;
+  const A = (b5.A - 1) / 6;
+  const C = (b5.C - 1) / 6;
+  const N = (b5.N - 1) / 6;
+  const O = (b5.O - 1) / 6;
+  const c1 = prof.gradientFrom;
+  const c2 = prof.gradientTo;
+  const accent = prof.color;
+
+  // ─── ヘルパー ───
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.36; // 顔半径
+
+  // ─── 顔の形状 (E:丸→楕円, C:左右対称度) ───
+  const faceRX = r * lerp(0.92, 1.08, E);
+  const faceRY = r * lerp(1.06, 0.94, E);
+
+  // ─── 肌色 (MBTIグループで変化) ───
+  const skinTones = {
+    NT: '#fef3c7', NF: '#fce7f3', SJ: '#e0f2fe', SP: '#fef9c3',
+  };
+  const group = mbti[1] === 'N' ? (mbti[2] === 'T' ? 'NT' : 'NF') : (mbti[3] === 'J' ? 'SJ' : 'SP');
+  const skin = skinTones[group];
+
+  // ─── 髪型 (O:開放性→ワイルド, C:計画性→整頓) ───
+  const hairWild = lerp(0, 12, O);
+  const hairNeat = lerp(0, 1, C);
+
+  // ─── 目 (E:大きさ, N:輝き, A:柔らかさ) ───
+  const eyeScale = lerp(0.8, 1.3, E);
+  const eyeSparkle = N > 0.5;
+  const eyeSoft = A > 0.5;
+
+  // ─── 口 (E:笑顔幅, A:柔らかさ) ───
+  const smileWidth = lerp(6, 16, E);
+  const smileDepth = lerp(2, 7, (E + A) / 2);
+
+  // ─── 頬紅 (N:感受性, A:協調性) ───
+  const blushOpacity = lerp(0, 0.5, (N + A) / 2);
+
+  // ─── オーラ/装飾 (O:開放性) ───
+  const hasAura = O > 0.55;
+  const numParticles = Math.floor(lerp(0, 8, O));
+
+  // ─── seed from mbti for deterministic randomness ───
+  let seed = 0;
+  for (let i = 0; i < mbti.length; i++) seed = seed * 31 + mbti.charCodeAt(i);
+  const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed / 0x7fffffff); };
+
+  // ─── SVG 構築 ───
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">`;
+  svg += `<defs>`;
+  svg += `<radialGradient id="av-bg" cx="50%" cy="40%"><stop offset="0%" stop-color="${c2}" stop-opacity="0.2"/><stop offset="100%" stop-color="${c1}" stop-opacity="0.08"/></radialGradient>`;
+  svg += `<radialGradient id="av-skin"><stop offset="0%" stop-color="${skin}"/><stop offset="100%" stop-color="${skin}" stop-opacity="0.95"/></radialGradient>`;
+  svg += `<linearGradient id="av-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient>`;
+  if (eyeSparkle) {
+    svg += `<radialGradient id="av-sparkle"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></radialGradient>`;
+  }
+  svg += `</defs>`;
+
+  // 背景円
+  svg += `<circle cx="${cx}" cy="${cy}" r="${size * 0.48}" fill="url(#av-bg)"/>`;
+
+  // ─── オーラパーティクル ───
+  if (hasAura) {
+    for (let i = 0; i < numParticles; i++) {
+      const angle = (i / numParticles) * Math.PI * 2 + rng() * 0.5;
+      const dist = size * lerp(0.38, 0.46, rng());
+      const px = cx + Math.cos(angle) * dist;
+      const py = cy + Math.sin(angle) * dist;
+      const ps = lerp(2, 5, rng());
+      const po = lerp(0.15, 0.45, rng());
+      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${ps.toFixed(1)}" fill="${accent}" opacity="${po.toFixed(2)}"><animate attributeName="opacity" values="${po.toFixed(2)};${(po*0.3).toFixed(2)};${po.toFixed(2)}" dur="${lerp(2,4,rng()).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+    }
+  }
+
+  // ─── 身体（肩） ───
+  const shoulderY = cy + r * 1.05;
+  const shoulderW = faceRX * 1.4;
+  svg += `<ellipse cx="${cx}" cy="${shoulderY + size*0.12}" rx="${shoulderW}" ry="${size*0.15}" fill="${c1}" opacity="0.15"/>`;
+
+  // ─── 髪（後ろ） ───
+  const hairTop = cy - faceRY * 1.05;
+  const hairSideL = cx - faceRX * 1.15 - hairWild * 0.5;
+  const hairSideR = cx + faceRX * 1.15 + hairWild * 0.5;
+  svg += `<path d="M${hairSideL},${cy + faceRY * 0.3} Q${hairSideL - hairWild * 0.3},${hairTop - hairWild} ${cx},${hairTop - 8 - hairWild * 0.5} Q${hairSideR + hairWild * 0.3},${hairTop - hairWild} ${hairSideR},${cy + faceRY * 0.3} Z" fill="url(#av-hair)" opacity="0.9"/>`;
+
+  // ─── 顔 ───
+  svg += `<ellipse cx="${cx}" cy="${cy}" rx="${faceRX}" ry="${faceRY}" fill="url(#av-skin)" stroke="${c1}" stroke-width="1" stroke-opacity="0.1"/>`;
+
+  // ─── 髪（前髪） ───
+  const bangsY = cy - faceRY * 0.55;
+  if (hairNeat > 0.5) {
+    // 整った前髪
+    svg += `<path d="M${cx - faceRX * 0.85},${bangsY + 4} Q${cx},${bangsY - 10 - hairWild * 0.5} ${cx + faceRX * 0.85},${bangsY + 4} L${cx + faceRX * 1.05},${hairTop + 5} Q${cx},${hairTop - 5} ${cx - faceRX * 1.05},${hairTop + 5} Z" fill="url(#av-hair)"/>`;
+  } else {
+    // ワイルドな前髪
+    const spikes = 3 + Math.floor(O * 3);
+    let path = `M${cx - faceRX * 0.95},${bangsY + 8}`;
+    for (let i = 0; i <= spikes; i++) {
+      const t = i / spikes;
+      const sx = cx - faceRX * 0.95 + t * faceRX * 1.9;
+      const spikeH = hairWild * (0.5 + rng() * 0.8) + 8;
+      if (i < spikes) path += ` Q${sx + faceRX * 0.1},${bangsY - spikeH} ${sx + faceRX * 0.2},${bangsY + 3}`;
+    }
+    path += ` L${cx + faceRX * 1.05},${hairTop + 5} Q${cx},${hairTop - 5 - hairWild} ${cx - faceRX * 1.05},${hairTop + 5} Z`;
+    svg += `<path d="${path}" fill="url(#av-hair)"/>`;
+  }
+
+  // ─── 眉 (C:角度, E:太さ) ───
+  const browY = cy - faceRY * 0.22;
+  const browLen = faceRX * 0.3;
+  const browLift = lerp(0, -4, C); // 計画性高い→キリッと上がる
+  const browThick = lerp(1.5, 2.5, E);
+  svg += `<line x1="${cx - faceRX * 0.35}" y1="${browY}" x2="${cx - faceRX * 0.35 + browLen}" y2="${browY + browLift}" stroke="${c1}" stroke-width="${browThick}" stroke-linecap="round" opacity="0.5"/>`;
+  svg += `<line x1="${cx + faceRX * 0.35 - browLen}" y1="${browY + browLift}" x2="${cx + faceRX * 0.35}" y2="${browY}" stroke="${c1}" stroke-width="${browThick}" stroke-linecap="round" opacity="0.5"/>`;
+
+  // ─── 目 ───
+  const eyeY = cy - faceRY * 0.08;
+  const eyeSpacing = faceRX * 0.32;
+  const eyeW = 7 * eyeScale;
+  const eyeH = 8 * eyeScale;
+  const pupilR = 3.5 * eyeScale;
+
+  // 目の白
+  [-1, 1].forEach(side => {
+    const ex = cx + side * eyeSpacing;
+    if (eyeSoft) {
+      // 柔らかい丸目
+      svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${eyeW}" ry="${eyeH}" fill="#fff" stroke="${c1}" stroke-width="0.8" stroke-opacity="0.2"/>`;
+    } else {
+      // シャープな目
+      svg += `<ellipse cx="${ex}" cy="${eyeY}" rx="${eyeW * 1.1}" ry="${eyeH * 0.85}" fill="#fff" stroke="${c1}" stroke-width="0.8" stroke-opacity="0.2"/>`;
+    }
+    // 瞳
+    svg += `<circle cx="${ex}" cy="${eyeY + 0.5}" r="${pupilR}" fill="${c1}"/>`;
+    svg += `<circle cx="${ex}" cy="${eyeY + 0.5}" r="${pupilR * 0.55}" fill="${accent}" opacity="0.7"/>`;
+    // ハイライト
+    svg += `<circle cx="${ex - pupilR * 0.35}" cy="${eyeY - pupilR * 0.35}" r="${pupilR * 0.3}" fill="#fff" opacity="0.9"/>`;
+    // 追加キラキラ（感受性高い）
+    if (eyeSparkle) {
+      svg += `<circle cx="${ex + pupilR * 0.3}" cy="${eyeY - pupilR * 0.5}" r="${pupilR * 0.18}" fill="url(#av-sparkle)"/>`;
+      svg += `<circle cx="${ex + pupilR * 0.15}" cy="${eyeY + pupilR * 0.4}" r="${pupilR * 0.12}" fill="#fff" opacity="0.6"/>`;
+    }
+  });
+
+  // ─── 頬紅 ───
+  if (blushOpacity > 0.08) {
+    svg += `<ellipse cx="${cx - faceRX * 0.42}" cy="${eyeY + faceRY * 0.22}" rx="${faceRX * 0.14}" ry="${faceRY * 0.08}" fill="#f472b6" opacity="${blushOpacity.toFixed(2)}"/>`;
+    svg += `<ellipse cx="${cx + faceRX * 0.42}" cy="${eyeY + faceRY * 0.22}" rx="${faceRX * 0.14}" ry="${faceRY * 0.08}" fill="#f472b6" opacity="${blushOpacity.toFixed(2)}"/>`;
+  }
+
+  // ─── 鼻 ───
+  svg += `<ellipse cx="${cx}" cy="${cy + faceRY * 0.1}" rx="2.5" ry="1.5" fill="${c1}" opacity="0.12"/>`;
+
+  // ─── 口 ───
+  const mouthY = cy + faceRY * 0.3;
+  if (E > 0.55) {
+    // にっこり（開放的）
+    svg += `<path d="M${cx - smileWidth},${mouthY} Q${cx},${mouthY + smileDepth * 2} ${cx + smileWidth},${mouthY}" fill="none" stroke="${c1}" stroke-width="2" stroke-linecap="round" opacity="0.55"/>`;
+    if (E > 0.7) {
+      // 歯見せ笑顔
+      svg += `<path d="M${cx - smileWidth * 0.6},${mouthY + 1} Q${cx},${mouthY + smileDepth * 1.5} ${cx + smileWidth * 0.6},${mouthY + 1}" fill="#fff" stroke="none" opacity="0.7"/>`;
+    }
+  } else if (E > 0.3) {
+    // 穏やかな微笑み
+    svg += `<path d="M${cx - smileWidth * 0.7},${mouthY} Q${cx},${mouthY + smileDepth * 1.2} ${cx + smileWidth * 0.7},${mouthY}" fill="none" stroke="${c1}" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>`;
+  } else {
+    // 控えめ（内向的）
+    svg += `<path d="M${cx - smileWidth * 0.5},${mouthY} Q${cx},${mouthY + smileDepth * 0.6} ${cx + smileWidth * 0.5},${mouthY}" fill="none" stroke="${c1}" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>`;
+  }
+
+  // ─── MBTIシンボル装飾 ───
+  const symbolY = cy - faceRY - 16;
+  const symbols = {
+    INTJ: '♟', INTP: '∞', ENTJ: '⚡', ENTP: '💡',
+    INFJ: '🌊', INFP: '🌸', ENFJ: '✨', ENFP: '🦋',
+    ISTJ: '⬡', ISFJ: '🛡', ESTJ: '⚙', ESFJ: '♥',
+    ISTP: '▲', ISFP: '◆', ESTP: '⚡', ESFP: '★',
+  };
+  const sym = symbols[mbti] || '●';
+  svg += `<text x="${cx}" y="${symbolY}" text-anchor="middle" font-size="14" opacity="0.6">${sym}</text>`;
+
+  // ─── アクセサリ（タイプ別） ───
+  if (group === 'NT') {
+    // メガネ（知性）
+    const gY = eyeY;
+    const gW = eyeW * 1.5;
+    const gH = eyeH * 1.3;
+    svg += `<ellipse cx="${cx - eyeSpacing}" cy="${gY}" rx="${gW}" ry="${gH}" fill="none" stroke="${c1}" stroke-width="1.2" opacity="0.3"/>`;
+    svg += `<ellipse cx="${cx + eyeSpacing}" cy="${gY}" rx="${gW}" ry="${gH}" fill="none" stroke="${c1}" stroke-width="1.2" opacity="0.3"/>`;
+    svg += `<line x1="${cx - eyeSpacing + gW}" y1="${gY}" x2="${cx + eyeSpacing - gW}" y2="${gY}" stroke="${c1}" stroke-width="1" opacity="0.25"/>`;
+  } else if (group === 'NF') {
+    // 花/光のオーラ
+    for (let i = 0; i < 3; i++) {
+      const angle = -Math.PI * 0.6 + (i / 2) * Math.PI * 0.6;
+      const px = cx + Math.cos(angle) * (r + 8);
+      const py = cy - 5 + Math.sin(angle) * (r + 8);
+      svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="${c2}" opacity="0.35"><animate attributeName="r" values="3;4.5;3" dur="${(2 + i * 0.5).toFixed(1)}s" repeatCount="indefinite"/></circle>`;
+    }
+  } else if (group === 'SJ') {
+    // 襟/ネクタイ（きちんと感）
+    svg += `<path d="M${cx - 8},${shoulderY - 2} L${cx},${shoulderY + 12} L${cx + 8},${shoulderY - 2}" fill="${c1}" opacity="0.2"/>`;
+    svg += `<path d="M${cx - 3},${shoulderY} L${cx},${shoulderY + 10} L${cx + 3},${shoulderY}" fill="${accent}" opacity="0.25"/>`;
+  }
+  // SP → アクセサリなし（自由なスタイル）
+
+  svg += `</svg>`;
+  return svg;
+}
+
+/**
+ * アバター生成（小サイズ用ラッパー）
+ */
+function generateAvatarSmall(mbti, bigFive) {
+  return generateAvatar(mbti, bigFive, 120);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 8. Public API (window.Personality)
 // ═══════════════════════════════════════════════════════════════
 
 window.Personality = {
@@ -474,4 +710,6 @@ window.Personality = {
   applyTheme,
   calcLevel,
   LEVELS,
+  generateAvatar,
+  generateAvatarSmall,
 };
